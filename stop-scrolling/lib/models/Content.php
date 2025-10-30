@@ -9,8 +9,8 @@ require_once __DIR__ . '/../core/Database.php';
 class Content {
     private $db;
     
-    public function __construct() {
-        $this->db = Database::getInstance();
+    public function __construct($db = null) {
+        $this->db = $db ?: Database::getInstance();
     }
     
     /**
