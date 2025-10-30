@@ -1,0 +1,62 @@
+[27-Aug-2025 06:40:00 UTC] PHP Fatal error:  Uncaught ValueError: array_rand(): Argument #2 ($num) must be between 1 and the number of elements in argument #1 ($array) in /home/trialcluestoday/public_html/stop-scrolling/setup/populate_data.php:310
+Stack trace:
+#0 /home/trialcluestoday/public_html/stop-scrolling/setup/populate_data.php(310): array_rand(Array, 0)
+#1 /home/trialcluestoday/public_html/stop-scrolling/setup.php(21): require_once('/home/trialclue...')
+#2 {main}
+  thrown in /home/trialcluestoday/public_html/stop-scrolling/setup/populate_data.php on line 310
+[01-Sep-2025 08:12:16 UTC] PHP Warning:  session_name(): Session name cannot be changed after headers have already been sent in /home/trialcluestoday/public_html/stop-scrolling/config/app.php on line 127
+[01-Sep-2025 08:12:16 UTC] PHP Warning:  session_set_cookie_params(): Session cookie parameters cannot be changed after headers have already been sent in /home/trialcluestoday/public_html/stop-scrolling/config/app.php on line 128
+[01-Sep-2025 08:12:16 UTC] Query failed: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'u.full_name' in 'field list' SQL: SELECT 
+                    u.user_id,
+                    u.username,
+                    u.email,
+                    u.full_name,
+                    u.date_of_birth,
+                    u.country,
+                    u.timezone,
+                    u.is_verified,
+                    u.created_at,
+                    u.updated_at,
+                    u.last_login_at,
+                    up.cognitive_type,
+                    up.experience_level,
+                    up.preferred_difficulty,
+                    up.learning_goals,
+                    up.accessibility_needs
+                FROM ss_users u
+                LEFT JOIN ss_user_profiles up ON u.user_id = up.user_id
+                WHERE u.user_id = ?
+[01-Sep-2025 08:12:55 UTC] PHP Warning:  session_name(): Session name cannot be changed after headers have already been sent in /home/trialcluestoday/public_html/stop-scrolling/config/app.php on line 127
+[01-Sep-2025 08:12:55 UTC] PHP Warning:  session_set_cookie_params(): Session cookie parameters cannot be changed after headers have already been sent in /home/trialcluestoday/public_html/stop-scrolling/config/app.php on line 128
+[01-Sep-2025 08:12:55 UTC] Query failed: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'language' in 'field list' SQL: SELECT 
+                    language,
+                    theme,
+                    sound_enabled,
+                    vibration_enabled,
+                    push_notifications_enabled,
+                    email_notifications_enabled,
+                    data_sharing_consent,
+                    privacy_mode,
+                    session_timeout_minutes,
+                    auto_save_progress,
+                    updated_at
+                FROM ss_user_settings 
+                WHERE user_id = ?
+[01-Sep-2025 08:13:58 UTC] PHP Warning:  session_name(): Session name cannot be changed after headers have already been sent in /home/trialcluestoday/public_html/stop-scrolling/config/app.php on line 127
+[01-Sep-2025 08:13:58 UTC] PHP Warning:  session_set_cookie_params(): Session cookie parameters cannot be changed after headers have already been sent in /home/trialcluestoday/public_html/stop-scrolling/config/app.php on line 128
+[01-Sep-2025 08:13:58 UTC] Query failed: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'activities_completed' in 'field list' SQL: SELECT 
+                    total_sessions,
+                    total_time_spent_seconds,
+                    activities_completed,
+                    current_streak_days,
+                    longest_streak_days,
+                    points_earned,
+                    level,
+                    achievements_unlocked,
+                    preferred_session_length,
+                    average_session_rating,
+                    updated_at
+                FROM ss_user_statistics 
+                WHERE user_id = ?
+[01-Sep-2025 08:14:20 UTC] PHP Warning:  session_name(): Session name cannot be changed after headers have already been sent in /home/trialcluestoday/public_html/stop-scrolling/config/app.php on line 127
+[01-Sep-2025 08:14:20 UTC] PHP Warning:  session_set_cookie_params(): Session cookie parameters cannot be changed after headers have already been sent in /home/trialcluestoday/public_html/stop-scrolling/config/app.php on line 128

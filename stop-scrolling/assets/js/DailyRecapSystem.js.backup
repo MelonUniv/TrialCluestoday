@@ -1,0 +1,968 @@
+/**
+ * DailyRecapSystem.js
+ * Comprehensive daily recap and tomorrow preview system
+ * Provides detailed insights, progress summaries, and future planning
+ */
+
+class DailyRecapSystem {
+    constructor() {
+        // Recap configuration
+        this.recapConfig = {
+            autoShowRecap: true,
+            showRecapTime: '21:00', // 9 PM
+            minActivitiesForRecap: 3,
+            recapRetentionDays: 30,
+            insightGenerationEnabled: true,
+            tomorrowPlanningEnabled: true
+        };
+        
+        // Data aggregation settings
+        this.dataPoints = {
+            activities: [],
+            sessions: [],
+            performance: {},
+            streaks: {},
+            achievements: [],
+            xpGained: 0,
+            combos: [],
+            categories: {},
+            timeSpent: 0,
+            mood: null
+        };
+        
+        // Insight templates
+        this.insightTemplates = {
+            performance: {
+                excellent: "🌟 Outstanding performance today! You achieved {accuracy}% average accuracy across {activities} activities.",
+                good: "👏 Solid work today! You completed {activities} activities with {accuracy}% accuracy.",
+                improving: "📈 You're on an upward trend! Your performance improved by {improvement}% from yesterday.",
+                consistent: "🎯 Remarkable consistency! You maintained steady performance throughout the day.",
+                challenging: "💪 You tackled some tough challenges today. Every struggle builds strength!"
+            },
+            streaks: {
+                active: "🔥 Your {days}-day streak is burning bright! You're building incredible momentum.",
+                milestone: "🎉 Streak milestone achieved! {days} consecutive days of dedication!",
+                at_risk: "⚠️ Your amazing {days}-day streak needs attention tomorrow. Don't let it slip away!",
+                recovered: "💫 What a comeback! You recovered your streak beautifully today."
+            },
+            categories: {
+                balanced: "⚖️ Perfect balance! You explored {count} different cognitive categories today.",
+                focused: "🎯 Laser focus! You specialized in {category} activities and excelled.",
+                explorer: "🗺️ Cognitive explorer! You ventured into new mental territories.",
+                specialist: "🏆 Category mastery in progress! Your {category} skills are advancing rapidly."
+            },
+            achievements: {
+                badge_earned: "🏅 Badge unlocked! You earned the '{badge}' achievement today.",
+                level_up: "⬆️ Level up! You reached level {level} - your dedication is paying off!",
+                milestone: "🎯 Major milestone reached! You've completed {count} total activities.",
+                combo_master: "⚡ Combo champion! You achieved a {multiplier}x multiplier today."
+            },
+            time: {
+                morning_warrior: "🌅 Morning warrior! Your early sessions gave you a strong start.",
+                afternoon_champion: "☀️ Afternoon excellence! You powered through with great energy.",
+                evening_dedicator: "🌙 Evening dedication! You ended your day on a high note.",
+                night_owl: "🦉 Night owl achievement! Your late-night commitment is admirable."
+            },
+            mood: {
+                energetic: "⚡ High energy day! You approached challenges with enthusiasm and vigor.",
+                focused: "🎯 Laser-focused session! Your concentration was exceptional today.",
+                relaxed: "😌 Calm and steady! You maintained composure while achieving great results.",
+                challenged: "💪 You faced challenges head-on! Resilience builds character."
+            }
+        };
+        
+        // Tomorrow planning templates
+        this.planningTemplates = {
+            continue_momentum: "Keep riding your success wave! Tomorrow, aim for {suggestion}.",
+            improve_weak_area: "Tomorrow's opportunity: strengthen your {category} skills with targeted practice.",
+            maintain_streak: "Streak protection mission: complete at least {activities} activities to keep your {days}-day streak alive!",
+            explore_variety: "Tomorrow's adventure: explore the {category} category for a well-rounded cognitive workout.",
+            challenge_yourself: "Ready to level up? Tomorrow, try activities at {difficulty} difficulty level.",
+            consistency_focus: "Consistency is key! Aim for your usual {activities} activities to maintain momentum."
+        };
+        
+        // Visual themes for recap
+        this.themes = {
+            excellent: { color: '#10b981', gradient: 'linear-gradient(135deg, #10b981, #34d399)' },
+            good: { color: '#3b82f6', gradient: 'linear-gradient(135deg, #3b82f6, #60a5fa)' },
+            moderate: { color: '#f59e0b', gradient: 'linear-gradient(135deg, #f59e0b, #fbbf24)' },
+            challenging: { color: '#ef4444', gradient: 'linear-gradient(135deg, #ef4444, #f87171)' }
+        };
+        
+        this.init();
+    }
+    
+    async init() {
+        this.bindEvents();
+        this.scheduleAutoRecap();
+    }
+    
+    /**
+     * Collect today's data for recap
+     */
+    async collectTodaysData() {
+        const today = new Date().toDateString();
+        
+        try {
+            // Get all today's activities from various systems
+            const sessionData = await this.getSessionData(today);
+            const performanceData = await this.getPerformanceData(today);
+            const streakData = await this.getStreakData();
+            const achievementData = await this.getAchievementData(today);
+            const comboData = await this.getComboData(today);
+            
+            this.dataPoints = {
+                activities: sessionData.activities || [],
+                sessions: sessionData.sessions || [],
+                performance: performanceData,
+                streaks: streakData,
+                achievements: achievementData,
+                xpGained: comboData.xpGained || 0,
+                combos: comboData.combos || [],
+                categories: this.analyzeCategoryUsage(sessionData.activities),
+                timeSpent: this.calculateTotalTime(sessionData.activities),
+                mood: this.detectMoodFromPerformance(performanceData)
+            };
+            
+            return this.dataPoints;
+        } catch (error) {
+            console.error('Failed to collect today\'s data:', error);
+            return null;
+        }
+    }
+    
+    /**
+     * Generate comprehensive daily recap
+     */
+    async generateDailyRecap() {
+        const data = await this.collectTodaysData();
+        
+        if (!data || data.activities.length < this.recapConfig.minActivitiesForRecap) {
+            return null;
+        }
+        
+        const recap = {
+            date: new Date().toDateString(),
+            summary: this.generateSummary(data),
+            insights: this.generateInsights(data),
+            achievements: this.formatAchievements(data.achievements),
+            statistics: this.generateStatistics(data),
+            tomorrowPlan: await this.generateTomorrowPlan(data),
+            mood: data.mood,
+            theme: this.determineTheme(data)
+        };
+        
+        // Save recap for history
+        await this.saveRecap(recap);
+        
+        return recap;
+    }
+    
+    /**
+     * Generate summary section
+     */
+    generateSummary(data) {
+        const activities = data.activities.length;
+        const accuracy = this.calculateAverageAccuracy(data.activities);
+        const timeSpent = Math.round(data.timeSpent / 60); // Convert to minutes
+        const categories = Object.keys(data.categories).length;
+        
+        return {
+            activitiesCompleted: activities,
+            averageAccuracy: Math.round(accuracy * 100),
+            timeSpentMinutes: timeSpent,
+            categoriesExplored: categories,
+            xpGained: data.xpGained,
+            streakDays: data.streaks.currentDays || 0,
+            achievementsEarned: data.achievements.length,
+            bestComboMultiplier: this.getBestComboMultiplier(data.combos)
+        };
+    }
+    
+    /**
+     * Generate personalized insights
+     */
+    generateInsights(data) {
+        const insights = [];
+        
+        // Performance insights
+        insights.push(...this.generatePerformanceInsights(data));
+        
+        // Streak insights
+        if (data.streaks.currentDays > 0) {
+            insights.push(...this.generateStreakInsights(data));
+        }
+        
+        // Category insights
+        insights.push(...this.generateCategoryInsights(data));
+        
+        // Achievement insights
+        if (data.achievements.length > 0) {
+            insights.push(...this.generateAchievementInsights(data));
+        }
+        
+        // Time-based insights
+        insights.push(...this.generateTimeInsights(data));
+        
+        // Mood insights
+        if (data.mood) {
+            insights.push(...this.generateMoodInsights(data));
+        }
+        
+        return insights.slice(0, 5); // Limit to top 5 insights
+    }
+    
+    /**
+     * Generate performance insights
+     */
+    generatePerformanceInsights(data) {
+        const insights = [];
+        const accuracy = this.calculateAverageAccuracy(data.activities);
+        const activities = data.activities.length;
+        
+        // Determine performance level
+        let template;
+        if (accuracy >= 0.9) {
+            template = this.insightTemplates.performance.excellent;
+        } else if (accuracy >= 0.75) {
+            template = this.insightTemplates.performance.good;
+        } else if (this.isImproving(data)) {
+            template = this.insightTemplates.performance.improving;
+        } else if (this.isConsistent(data)) {
+            template = this.insightTemplates.performance.consistent;
+        } else {
+            template = this.insightTemplates.performance.challenging;
+        }
+        
+        insights.push({
+            type: 'performance',
+            message: template.replace('{accuracy}', Math.round(accuracy * 100))
+                           .replace('{activities}', activities)
+                           .replace('{improvement}', '15'), // Placeholder
+            icon: accuracy >= 0.9 ? '🌟' : accuracy >= 0.75 ? '👏' : '💪',
+            color: accuracy >= 0.9 ? '#10b981' : accuracy >= 0.75 ? '#3b82f6' : '#f59e0b'
+        });
+        
+        return insights;
+    }
+    
+    /**
+     * Generate streak insights
+     */
+    generateStreakInsights(data) {
+        const insights = [];
+        const streakDays = data.streaks.currentDays;
+        const isMilestone = this.isStreakMilestone(streakDays);
+        
+        let template;
+        if (isMilestone) {
+            template = this.insightTemplates.streaks.milestone;
+        } else if (data.streaks.isAtRisk) {
+            template = this.insightTemplates.streaks.at_risk;
+        } else {
+            template = this.insightTemplates.streaks.active;
+        }
+        
+        insights.push({
+            type: 'streak',
+            message: template.replace('{days}', streakDays),
+            icon: '🔥',
+            color: '#ef4444'
+        });
+        
+        return insights;
+    }
+    
+    /**
+     * Generate category insights
+     */
+    generateCategoryInsights(data) {
+        const insights = [];
+        const categories = Object.keys(data.categories);
+        const categoryCount = categories.length;
+        
+        if (categoryCount >= 4) {
+            insights.push({
+                type: 'category',
+                message: this.insightTemplates.categories.balanced.replace('{count}', categoryCount),
+                icon: '⚖️',
+                color: '#8b5cf6'
+            });
+        } else if (categoryCount === 1) {
+            const focusCategory = categories[0];
+            insights.push({
+                type: 'category',
+                message: this.insightTemplates.categories.focused.replace('{category}', focusCategory),
+                icon: '🎯',
+                color: '#06b6d4'
+            });
+        }
+        
+        return insights;
+    }
+    
+    /**
+     * Generate achievement insights
+     */
+    generateAchievementInsights(data) {
+        const insights = [];
+        
+        data.achievements.forEach(achievement => {
+            if (achievement.type === 'badge') {
+                insights.push({
+                    type: 'achievement',
+                    message: this.insightTemplates.achievements.badge_earned.replace('{badge}', achievement.name),
+                    icon: '🏅',
+                    color: '#f59e0b'
+                });
+            } else if (achievement.type === 'level_up') {
+                insights.push({
+                    type: 'achievement',
+                    message: this.insightTemplates.achievements.level_up.replace('{level}', achievement.level),
+                    icon: '⬆️',
+                    color: '#10b981'
+                });
+            }
+        });
+        
+        return insights;
+    }
+    
+    /**
+     * Generate time-based insights
+     */
+    generateTimeInsights(data) {
+        const insights = [];
+        const timeDistribution = this.analyzeTimeDistribution(data.activities);
+        
+        if (timeDistribution.morning > 0.5) {
+            insights.push({
+                type: 'time',
+                message: this.insightTemplates.time.morning_warrior,
+                icon: '🌅',
+                color: '#fbbf24'
+            });
+        } else if (timeDistribution.evening > 0.5) {
+            insights.push({
+                type: 'time',
+                message: this.insightTemplates.time.evening_dedicator,
+                icon: '🌙',
+                color: '#6366f1'
+            });
+        }
+        
+        return insights;
+    }
+    
+    /**
+     * Generate mood insights
+     */
+    generateMoodInsights(data) {
+        const insights = [];
+        
+        if (data.mood) {
+            const template = this.insightTemplates.mood[data.mood];
+            if (template) {
+                insights.push({
+                    type: 'mood',
+                    message: template,
+                    icon: this.getMoodIcon(data.mood),
+                    color: this.getMoodColor(data.mood)
+                });
+            }
+        }
+        
+        return insights;
+    }
+    
+    /**
+     * Generate tomorrow's action plan
+     */
+    async generateTomorrowPlan(data) {
+        const plan = {
+            primaryGoal: null,
+            suggestedActivities: 0,
+            focusCategory: null,
+            difficulty: 'adaptive',
+            tips: [],
+            motivation: null
+        };
+        
+        // Determine primary goal based on today's performance
+        if (data.streaks.currentDays > 0 && data.streaks.isAtRisk) {
+            plan.primaryGoal = 'maintain_streak';
+            plan.suggestedActivities = Math.max(3, Math.round(data.activities.length * 0.8));
+            plan.motivation = this.planningTemplates.maintain_streak
+                .replace('{activities}', plan.suggestedActivities)
+                .replace('{days}', data.streaks.currentDays);
+        } else if (this.hasWeakCategory(data)) {
+            plan.primaryGoal = 'improve_weak_area';
+            plan.focusCategory = this.getWeakestCategory(data);
+            plan.motivation = this.planningTemplates.improve_weak_area
+                .replace('{category}', plan.focusCategory);
+        } else if (data.activities.length > 0 && this.calculateAverageAccuracy(data.activities) >= 0.8) {
+            plan.primaryGoal = 'continue_momentum';
+            plan.suggestedActivities = data.activities.length;
+            plan.motivation = this.planningTemplates.continue_momentum
+                .replace('{suggestion}', 'maintaining your excellent performance');
+        } else {
+            plan.primaryGoal = 'consistency_focus';
+            plan.suggestedActivities = Math.max(5, Math.round(data.activities.length * 1.1));
+            plan.motivation = this.planningTemplates.consistency_focus
+                .replace('{activities}', plan.suggestedActivities);
+        }
+        
+        // Generate specific tips
+        plan.tips = this.generateTomorrowTips(data, plan);
+        
+        return plan;
+    }
+    
+    /**
+     * Generate specific tips for tomorrow
+     */
+    generateTomorrowTips(data, plan) {
+        const tips = [];
+        
+        // Time-based tip
+        const bestTimeOfDay = this.getBestTimeOfDay(data);
+        if (bestTimeOfDay) {
+            tips.push({
+                icon: '⏰',
+                text: `Your peak performance time is during ${bestTimeOfDay}. Schedule your session accordingly!`
+            });
+        }
+        
+        // Category tip
+        if (plan.focusCategory) {
+            tips.push({
+                icon: '🎯',
+                text: `Focus on ${plan.focusCategory} activities to strengthen this area.`
+            });
+        }
+        
+        // Difficulty tip
+        const avgAccuracy = this.calculateAverageAccuracy(data.activities);
+        if (avgAccuracy >= 0.9) {
+            tips.push({
+                icon: '📈',
+                text: 'You\'re ready for higher difficulty! Challenge yourself with advanced activities.'
+            });
+        } else if (avgAccuracy < 0.6) {
+            tips.push({
+                icon: '🎯',
+                text: 'Focus on accuracy over speed. Quality practice builds stronger foundations.'
+            });
+        }
+        
+        // Streak tip
+        if (data.streaks.currentDays > 0) {
+            tips.push({
+                icon: '🔥',
+                text: `Your ${data.streaks.currentDays}-day streak is valuable! Don't break the chain.`
+            });
+        }
+        
+        return tips.slice(0, 3); // Limit to 3 tips
+    }
+    
+    /**
+     * Display daily recap modal
+     */
+    displayDailyRecap(recap) {
+        if (!recap) return;
+        
+        const modal = document.createElement('div');
+        modal.className = 'daily-recap-modal';
+        modal.innerHTML = `
+            <div class="modal-backdrop" onclick="this.parentElement.remove()"></div>
+            <div class="recap-container">
+                <div class="recap-header" style="background: ${recap.theme.gradient}">
+                    <div class="recap-date">
+                        <h2>Daily Recap</h2>
+                        <p>${this.formatDate(new Date())}</p>
+                    </div>
+                    <div class="recap-mood">
+                        <span class="mood-icon">${this.getMoodIcon(recap.mood)}</span>
+                        <span class="mood-text">${recap.mood || 'Focused'} Day</span>
+                    </div>
+                </div>
+                
+                <div class="recap-content">
+                    ${this.renderRecapSummary(recap.summary)}
+                    ${this.renderRecapInsights(recap.insights)}
+                    ${this.renderRecapAchievements(recap.achievements)}
+                    ${this.renderTomorrowPlan(recap.tomorrowPlan)}
+                </div>
+                
+                <div class="recap-footer">
+                    <button class="btn-secondary" onclick="this.closest('.daily-recap-modal').remove()">
+                        Close
+                    </button>
+                    <button class="btn-primary" onclick="dailyRecapSystem.shareDailyRecap()">
+                        Share Progress
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Animate in
+        setTimeout(() => modal.classList.add('show'), 100);
+        
+        return modal;
+    }
+    
+    /**
+     * Render recap summary section
+     */
+    renderRecapSummary(summary) {
+        return `
+            <div class="recap-section summary">
+                <h3>📊 Today's Summary</h3>
+                <div class="summary-grid">
+                    <div class="summary-stat">
+                        <div class="stat-value">${summary.activitiesCompleted}</div>
+                        <div class="stat-label">Activities</div>
+                    </div>
+                    <div class="summary-stat">
+                        <div class="stat-value">${summary.averageAccuracy}%</div>
+                        <div class="stat-label">Accuracy</div>
+                    </div>
+                    <div class="summary-stat">
+                        <div class="stat-value">${summary.timeSpentMinutes}m</div>
+                        <div class="stat-label">Time Spent</div>
+                    </div>
+                    <div class="summary-stat">
+                        <div class="stat-value">${summary.xpGained}</div>
+                        <div class="stat-label">XP Gained</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    /**
+     * Render insights section
+     */
+    renderRecapInsights(insights) {
+        if (insights.length === 0) return '';
+        
+        return `
+            <div class="recap-section insights">
+                <h3>💡 Key Insights</h3>
+                <div class="insights-list">
+                    ${insights.map(insight => `
+                        <div class="insight-item" style="border-left-color: ${insight.color}">
+                            <span class="insight-icon">${insight.icon}</span>
+                            <span class="insight-text">${insight.message}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    /**
+     * Render achievements section
+     */
+    renderRecapAchievements(achievements) {
+        if (achievements.length === 0) return '';
+        
+        return `
+            <div class="recap-section achievements">
+                <h3>🏆 Today's Achievements</h3>
+                <div class="achievements-list">
+                    ${achievements.map(achievement => `
+                        <div class="achievement-item">
+                            <span class="achievement-icon">${achievement.icon}</span>
+                            <div class="achievement-info">
+                                <div class="achievement-name">${achievement.name}</div>
+                                <div class="achievement-description">${achievement.description}</div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    /**
+     * Render tomorrow's plan section
+     */
+    renderTomorrowPlan(plan) {
+        return `
+            <div class="recap-section tomorrow-plan">
+                <h3>🚀 Tomorrow's Plan</h3>
+                <div class="plan-motivation">${plan.motivation}</div>
+                <div class="plan-details">
+                    <div class="plan-goal">
+                        <span class="plan-icon">🎯</span>
+                        <span>Goal: ${plan.suggestedActivities} activities</span>
+                    </div>
+                    ${plan.focusCategory ? `
+                        <div class="plan-focus">
+                            <span class="plan-icon">📚</span>
+                            <span>Focus: ${plan.focusCategory} category</span>
+                        </div>
+                    ` : ''}
+                </div>
+                ${plan.tips.length > 0 ? `
+                    <div class="plan-tips">
+                        <h4>💡 Tips for Success:</h4>
+                        ${plan.tips.map(tip => `
+                            <div class="plan-tip">
+                                <span class="tip-icon">${tip.icon}</span>
+                                <span class="tip-text">${tip.text}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }
+    
+    /**
+     * Utility functions for data analysis
+     */
+    calculateAverageAccuracy(activities) {
+        if (activities.length === 0) return 0;
+        const total = activities.reduce((sum, activity) => sum + (activity.accuracy || 0), 0);
+        return total / activities.length;
+    }
+    
+    calculateTotalTime(activities) {
+        return activities.reduce((sum, activity) => sum + (activity.duration || 0), 0);
+    }
+    
+    analyzeCategoryUsage(activities) {
+        const categories = {};
+        activities.forEach(activity => {
+            categories[activity.category] = (categories[activity.category] || 0) + 1;
+        });
+        return categories;
+    }
+    
+    analyzeTimeDistribution(activities) {
+        const distribution = { morning: 0, afternoon: 0, evening: 0 };
+        
+        activities.forEach(activity => {
+            const hour = new Date(activity.timestamp).getHours();
+            if (hour >= 6 && hour < 12) distribution.morning++;
+            else if (hour >= 12 && hour < 18) distribution.afternoon++;
+            else distribution.evening++;
+        });
+        
+        const total = activities.length;
+        return {
+            morning: distribution.morning / total,
+            afternoon: distribution.afternoon / total,
+            evening: distribution.evening / total
+        };
+    }
+    
+    detectMoodFromPerformance(performance) {
+        const accuracy = performance.avgAccuracy || 0;
+        const consistency = performance.consistency || 0;
+        
+        if (accuracy >= 0.9 && consistency >= 0.8) return 'energetic';
+        if (accuracy >= 0.8) return 'focused';
+        if (consistency >= 0.8) return 'relaxed';
+        return 'challenged';
+    }
+    
+    determineTheme(data) {
+        const accuracy = this.calculateAverageAccuracy(data.activities);
+        
+        if (accuracy >= 0.9) return this.themes.excellent;
+        if (accuracy >= 0.75) return this.themes.good;
+        if (accuracy >= 0.6) return this.themes.moderate;
+        return this.themes.challenging;
+    }
+    
+    getBestComboMultiplier(combos) {
+        if (combos.length === 0) return 1.0;
+        return Math.max(...combos.map(combo => combo.multiplier || 1.0));
+    }
+    
+    isStreakMilestone(days) {
+        const milestones = [3, 7, 14, 30, 60, 100, 365];
+        return milestones.includes(days);
+    }
+    
+    isImproving(data) {
+        // Simple check - would need historical data for real implementation
+        return data.performance.trend === 'improving';
+    }
+    
+    isConsistent(data) {
+        // Check if performance variation is low
+        return data.performance.consistency >= 0.8;
+    }
+    
+    hasWeakCategory(data) {
+        const categories = data.categories;
+        const categoryAccuracies = {}; // Would need detailed category performance
+        return Object.values(categoryAccuracies).some(acc => acc < 0.6);
+    }
+    
+    getWeakestCategory(data) {
+        // Return the category with lowest performance
+        return 'memory_game'; // Placeholder
+    }
+    
+    getBestTimeOfDay(data) {
+        const timePerformance = this.analyzeTimeDistribution(data.activities);
+        const best = Object.entries(timePerformance).reduce((a, b) => 
+            timePerformance[a[0]] > timePerformance[b[0]] ? a : b
+        );
+        return best[0];
+    }
+    
+    getMoodIcon(mood) {
+        const icons = {
+            energetic: '⚡',
+            focused: '🎯',
+            relaxed: '😌',
+            challenged: '💪'
+        };
+        return icons[mood] || '🎯';
+    }
+    
+    getMoodColor(mood) {
+        const colors = {
+            energetic: '#f59e0b',
+            focused: '#3b82f6',
+            relaxed: '#10b981',
+            challenged: '#ef4444'
+        };
+        return colors[mood] || '#6b7280';
+    }
+    
+    formatDate(date) {
+        return date.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    }
+    
+    formatAchievements(achievements) {
+        return achievements.map(achievement => ({
+            ...achievement,
+            icon: achievement.icon || '🏆'
+        }));
+    }
+    
+    /**
+     * Data collection methods (would integrate with actual systems)
+     */
+    async getSessionData(date) {
+        // This would integrate with the actual session manager
+        return {
+            activities: [],
+            sessions: []
+        };
+    }
+    
+    async getPerformanceData(date) {
+        // This would integrate with the performance tracker
+        return {
+            avgAccuracy: 0.75,
+            consistency: 0.8,
+            trend: 'stable'
+        };
+    }
+    
+    async getStreakData() {
+        // This would integrate with the streak system
+        return {
+            currentDays: 5,
+            isAtRisk: false
+        };
+    }
+    
+    async getAchievementData(date) {
+        // This would integrate with the achievement system
+        return [];
+    }
+    
+    async getComboData(date) {
+        // This would integrate with the combo system
+        return {
+            xpGained: 0,
+            combos: []
+        };
+    }
+    
+    /**
+     * Auto-scheduling and triggers
+     */
+    scheduleAutoRecap() {
+        if (!this.recapConfig.autoShowRecap) return;
+        
+        const now = new Date();
+        const [hours, minutes] = this.recapConfig.showRecapTime.split(':');
+        const recapTime = new Date(now);
+        recapTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+        
+        // If recap time has passed today, schedule for tomorrow
+        if (now > recapTime) {
+            recapTime.setDate(recapTime.getDate() + 1);
+        }
+        
+        const timeUntilRecap = recapTime.getTime() - now.getTime();
+        
+        setTimeout(async () => {
+            const recap = await this.generateDailyRecap();
+            if (recap) {
+                this.displayDailyRecap(recap);
+            }
+            
+            // Schedule for tomorrow
+            setTimeout(() => this.scheduleAutoRecap(), 24 * 60 * 60 * 1000);
+        }, timeUntilRecap);
+    }
+    
+    /**
+     * Manual triggers
+     */
+    async showTodaysRecap() {
+        const recap = await this.generateDailyRecap();
+        if (recap) {
+            this.displayDailyRecap(recap);
+        } else {
+            this.showNoDataMessage();
+        }
+    }
+    
+    showNoDataMessage() {
+        // Show a message when there's insufficient data for recap
+        const message = document.createElement('div');
+        message.className = 'no-recap-message';
+        message.innerHTML = `
+            <div class="no-recap-content">
+                <span class="no-recap-icon">📊</span>
+                <h3>Not Enough Data Yet</h3>
+                <p>Complete at least ${this.recapConfig.minActivitiesForRecap} activities to generate your daily recap!</p>
+                <button onclick="this.parentElement.parentElement.remove()">Got it</button>
+            </div>
+        `;
+        
+        document.body.appendChild(message);
+        setTimeout(() => message.classList.add('show'), 100);
+        setTimeout(() => {
+            message.classList.remove('show');
+            setTimeout(() => message.remove(), 500);
+        }, 3000);
+    }
+    
+    /**
+     * Share functionality
+     */
+    shareDailyRecap() {
+        const shareText = `🧠 Daily Cognitive Training Recap:\n✅ Completed activities with great focus\n🎯 Building mental strength every day\n📈 Progress never stops!\n\nJoin me in breaking free from social media addiction: ${window.location.origin}/stop-scrolling/`;
+        
+        if (navigator.share) {
+            navigator.share({
+                title: 'My Daily Brain Training Progress',
+                text: shareText,
+                url: window.location.href
+            });
+        } else {
+            navigator.clipboard.writeText(shareText);
+            // Show notification
+            this.showNotification('Progress copied to clipboard!');
+        }
+    }
+    
+    showNotification(message) {
+        const notification = document.createElement('div');
+        notification.className = 'simple-notification';
+        notification.textContent = message;
+        
+        document.body.appendChild(notification);
+        setTimeout(() => notification.classList.add('show'), 100);
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => notification.remove(), 300);
+        }, 2000);
+    }
+    
+    /**
+     * Storage and history
+     */
+    async saveRecap(recap) {
+        try {
+            // Save to server
+            await this.apiRequest('/api/v1/recaps/save', {
+                method: 'POST',
+                body: recap
+            });
+            
+            // Save locally as backup
+            this.saveLocalRecap(recap);
+        } catch (error) {
+            console.error('Failed to save recap:', error);
+            this.saveLocalRecap(recap);
+        }
+    }
+    
+    saveLocalRecap(recap) {
+        try {
+            const recaps = JSON.parse(localStorage.getItem('ss_daily_recaps') || '[]');
+            recaps.unshift(recap);
+            
+            // Keep only last 30 recaps
+            if (recaps.length > this.recapConfig.recapRetentionDays) {
+                recaps.splice(this.recapConfig.recapRetentionDays);
+            }
+            
+            localStorage.setItem('ss_daily_recaps', JSON.stringify(recaps));
+        } catch (error) {
+            console.error('Failed to save local recap:', error);
+        }
+    }
+    
+    async apiRequest(endpoint, options = {}) {
+        const token = localStorage.getItem('ss_access_token');
+        
+        const response = await fetch(`https://trial.cluestoday.com/stop-scrolling${endpoint}`, {
+            method: options.method || 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                ...options.headers
+            },
+            body: options.body ? JSON.stringify(options.body) : undefined
+        });
+        
+        return await response.json();
+    }
+    
+    /**
+     * Event handling
+     */
+    bindEvents() {
+        // Listen for end-of-day triggers
+        window.addEventListener('session:ended', () => {
+            // Check if it's late enough in the day for recap
+            const hour = new Date().getHours();
+            if (hour >= 20) { // After 8 PM
+                setTimeout(() => this.showTodaysRecap(), 2000);
+            }
+        });
+        
+        // Listen for manual recap requests
+        window.addEventListener('recap:show', () => {
+            this.showTodaysRecap();
+        });
+    }
+}
+
+// Export for use in other modules
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = DailyRecapSystem;
+}

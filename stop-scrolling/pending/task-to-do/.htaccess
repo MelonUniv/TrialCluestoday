@@ -1,0 +1,15 @@
+RewriteEngine On
+
+# Remove .html extension and redirect to extensionless URLs
+RewriteCond %{THE_REQUEST} /([^.]+)\.html [NC]
+RewriteRule ^ /%1 [NC,L,R]
+
+# Add .html extension internally for extensionless URLs
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^([^.]*)$ $1.html [NC,L]
+
+# Set proper MIME types
+<Files "*.html">
+    Header set Content-Type "text/html; charset=UTF-8"
+</Files>

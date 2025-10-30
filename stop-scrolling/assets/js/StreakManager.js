@@ -1,0 +1,760 @@
+/**
+ * StreakManager.js
+ * Comprehensive streak tracking system for continuous play engagement
+ * Manages daily streaks, milestone rewards, and streak recovery options
+ */
+
+class StreakManager {
+    constructor() {
+        // Streak configuration
+        this.streakConfig = {
+            dailyGoal: 9,           // Default activities per day
+            graceHours: 6,          // Hours past midnight to count as previous day
+            maxStreakRecovery: 3,   // Max times user can recover a broken streak
+            streakMilestones: [3, 7, 14, 30, 60, 100, 365], // Days for milestone rewards
+            recoveryTimeWindow: 24  // Hours to offer streak recovery after break
+        };
+        
+        // Current streak data
+        this.currentStreak = {
+            days: 0,
+            startDate: null,
+            lastActivityDate: null,
+            totalActivities: 0,
+            milestoneRewards: [],
+            isActive: false,
+            streak_id: null
+        };
+        
+        // Streak history
+        this.streakHistory = [];
+        
+        // Recovery options
+        this.recoveryOptions = {
+            available: 0,
+            used: 0,
+            lastRecoveryDate: null,
+            canRecover: false
+        };
+        
+        // Motivation messages
+        this.motivationMessages = {
+            newStreak: [
+                "Great start! You've begun your streak journey! 🎯",
+                "Welcome to your streak adventure! Every day counts! ⭐",
+                "Your first day is complete! Keep the momentum going! 🚀"
+            ],
+            continuing: [
+                "Amazing! Your streak is growing stronger! 💪",
+                "You're on fire! Keep up the fantastic work! 🔥",
+                "Consistency is key - you're nailing it! 🎖️",
+                "Each day makes you stronger! Well done! ⚡"
+            ],
+            milestone: [
+                "Incredible milestone achieved! You're unstoppable! 🏆",
+                "What an achievement! Your dedication is inspiring! 🌟",
+                "Milestone conquered! You're a true champion! 👑"
+            ],
+            recovery: [
+                "Don't worry! Even champions need breaks. Ready to bounce back? 🔄",
+                "Every expert was once a beginner. Your comeback starts now! 💫",
+                "Streaks can be rebuilt. Your journey continues! 🌈"
+            ],
+            broken: [
+                "Your streak may have ended, but your progress remains! 📈",
+                "Every ending is a new beginning. Start fresh today! 🌅",
+                "Champions rise after falls. Ready for round two? 🥊"
+            ]
+        };
+        
+        this.init();
+    }
+    
+    async init() {
+        await this.loadStreakData();
+        this.checkStreakStatus();
+        this.startDailyCheck();
+    }
+    
+    /**
+     * Load streak data from server
+     */
+    async loadStreakData() {
+        try {
+            const response = await this.apiRequest('/api/v1/streaks/current');
+            
+            if (response.success && response.data) {
+                this.currentStreak = {
+                    ...this.currentStreak,
+                    ...response.data.streak
+                };
+                
+                this.recoveryOptions = {
+                    ...this.recoveryOptions,
+                    ...response.data.recovery
+                };
+                
+                this.streakHistory = response.data.history || [];
+            }
+        } catch (error) {
+            console.error('Failed to load streak data:', error);
+            // Load from local storage as fallback
+            this.loadLocalStreakData();
+        }
+    }
+    
+    /**
+     * Update streak when activity is completed
+     */
+    async recordActivity(activityData) {
+        const today = new Date().toDateString();
+        const now = new Date();
+        
+        try {
+            // Check if this is first activity of the day
+            const isFirstToday = !this.currentStreak.lastActivityDate || 
+                                 new Date(this.currentStreak.lastActivityDate).toDateString() !== today;
+            
+            if (isFirstToday) {
+                // Check if streak continues or breaks
+                const streakResult = await this.processStreakDay();
+                
+                if (streakResult.streakBroken && !streakResult.recovered) {
+                    this.emit('streakBroken', {
+                        previousStreak: streakResult.previousDays,
+                        canRecover: this.canOfferRecovery()
+                    });
+                } else if (streakResult.milestone) {
+                    this.emit('milestone', {
+                        days: this.currentStreak.days,
+                        milestone: streakResult.milestone,
+                        reward: streakResult.reward
+                    });
+                }
+            }
+            
+            // Update activity count
+            this.currentStreak.totalActivities++;
+            this.currentStreak.lastActivityDate = now.toISOString();
+            
+            // Save to server
+            await this.saveStreakData();
+            
+            // Emit progress update
+            this.emit('activityRecorded', {
+                streak: this.currentStreak,
+                progress: this.getStreakProgress(),
+                message: this.getMotivationMessage()
+            });
+            
+            return {
+                success: true,
+                streak: this.currentStreak,
+                isFirstToday,
+                progress: this.getStreakProgress()
+            };
+            
+        } catch (error) {
+            console.error('Failed to record activity for streak:', error);
+            return { success: false, error: error.message };
+        }
+    }
+    
+    /**
+     * Process new streak day
+     */
+    async processStreakDay() {
+        const today = new Date();
+        const todayString = today.toDateString();
+        
+        if (!this.currentStreak.lastActivityDate) {
+            // First ever activity
+            return this.startNewStreak();
+        }
+        
+        const lastActivityDate = new Date(this.currentStreak.lastActivityDate);
+        const daysDifference = this.getDaysDifference(lastActivityDate, today);
+        
+        if (daysDifference === 1) {
+            // Consecutive day - continue streak
+            return this.continueStreak();
+        } else if (daysDifference === 0) {
+            // Same day - no streak change
+            return { streakContinued: true };
+        } else {
+            // Gap in days - streak broken
+            return this.handleStreakBreak(daysDifference);
+        }
+    }
+    
+    /**
+     * Start a new streak
+     */
+    startNewStreak() {
+        const now = new Date();
+        
+        this.currentStreak = {
+            days: 1,
+            startDate: now.toISOString(),
+            lastActivityDate: now.toISOString(),
+            totalActivities: 0,
+            milestoneRewards: [],
+            isActive: true,
+            streak_id: this.generateStreakId()
+        };
+        
+        return { 
+            newStreak: true,
+            days: 1
+        };
+    }
+    
+    /**
+     * Continue existing streak
+     */
+    continueStreak() {
+        this.currentStreak.days++;
+        this.currentStreak.isActive = true;
+        
+        // Check for milestones
+        const milestone = this.checkMilestone(this.currentStreak.days);
+        let result = { 
+            streakContinued: true, 
+            days: this.currentStreak.days 
+        };
+        
+        if (milestone) {
+            result.milestone = milestone.days;
+            result.reward = milestone.reward;
+            this.currentStreak.milestoneRewards.push(milestone);
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Handle streak break
+     */
+    async handleStreakBreak(daysDifference) {
+        const previousDays = this.currentStreak.days;
+        
+        // Save broken streak to history
+        if (this.currentStreak.days > 0) {
+            this.streakHistory.push({
+                ...this.currentStreak,
+                endDate: new Date().toISOString(),
+                daysLasted: this.currentStreak.days,
+                reason: 'missed_day'
+            });
+        }
+        
+        // Check if recovery is possible
+        const canRecover = this.canOfferRecovery() && daysDifference <= 3;
+        
+        if (canRecover) {
+            return {
+                streakBroken: true,
+                previousDays,
+                canRecover: true,
+                recoveryOffered: true
+            };
+        } else {
+            // Start fresh
+            this.startNewStreak();
+            return {
+                streakBroken: true,
+                previousDays,
+                newStreakStarted: true,
+                days: 1
+            };
+        }
+    }
+    
+    /**
+     * Offer streak recovery to user
+     */
+    async offerStreakRecovery() {
+        if (!this.canOfferRecovery()) {
+            return { success: false, reason: 'no_recovery_available' };
+        }
+        
+        const recoveryOptions = this.getRecoveryOptions();
+        
+        this.emit('recoveryOffered', {
+            options: recoveryOptions,
+            currentStreak: this.currentStreak.days,
+            deadline: this.getRecoveryDeadline()
+        });
+        
+        return {
+            success: true,
+            options: recoveryOptions
+        };
+    }
+    
+    /**
+     * Process streak recovery
+     */
+    async recoverStreak(option) {
+        if (!this.canOfferRecovery()) {
+            return { success: false, reason: 'no_recovery_available' };
+        }
+        
+        try {
+            let recovered = false;
+            
+            switch (option.type) {
+                case 'extra_activities':
+                    // Complete double activities today
+                    recovered = await this.processExtraActivitiesRecovery();
+                    break;
+                case 'streak_freeze':
+                    // Use streak freeze token
+                    recovered = await this.processStreakFreezeRecovery();
+                    break;
+                case 'bonus_challenge':
+                    // Complete special challenge
+                    recovered = await this.processBonusChallengeRecovery();
+                    break;
+            }
+            
+            if (recovered) {
+                this.recoveryOptions.used++;
+                this.recoveryOptions.lastRecoveryDate = new Date().toISOString();
+                this.currentStreak.isActive = true;
+                
+                await this.saveStreakData();
+                
+                this.emit('streakRecovered', {
+                    method: option.type,
+                    streak: this.currentStreak
+                });
+                
+                return { success: true, streak: this.currentStreak };
+            }
+            
+            return { success: false, reason: 'recovery_failed' };
+            
+        } catch (error) {
+            console.error('Streak recovery failed:', error);
+            return { success: false, error: error.message };
+        }
+    }
+    
+    /**
+     * Check if recovery can be offered
+     */
+    canOfferRecovery() {
+        const maxRecoveries = this.streakConfig.maxStreakRecovery;
+        const used = this.recoveryOptions.used;
+        const timeWindow = this.streakConfig.recoveryTimeWindow * 60 * 60 * 1000;
+        
+        if (used >= maxRecoveries) return false;
+        
+        if (this.recoveryOptions.lastRecoveryDate) {
+            const timeSinceRecovery = Date.now() - new Date(this.recoveryOptions.lastRecoveryDate).getTime();
+            if (timeSinceRecovery < timeWindow) return false;
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Get recovery options available to user
+     */
+    getRecoveryOptions() {
+        const options = [];
+        
+        // Extra activities option (always available)
+        options.push({
+            type: 'extra_activities',
+            title: 'Double Up Challenge',
+            description: `Complete ${this.streakConfig.dailyGoal * 2} activities today to recover your streak`,
+            difficulty: 'medium',
+            timeRequired: '30-45 minutes'
+        });
+        
+        // Streak freeze (if user has earned any)
+        const freezeTokens = this.getStreakFreezeTokens();
+        if (freezeTokens > 0) {
+            options.push({
+                type: 'streak_freeze',
+                title: 'Use Streak Freeze',
+                description: 'Use one of your earned streak freeze tokens',
+                difficulty: 'easy',
+                tokensRequired: 1,
+                tokensAvailable: freezeTokens
+            });
+        }
+        
+        // Bonus challenge (for longer streaks)
+        if (this.currentStreak.days >= 7) {
+            options.push({
+                type: 'bonus_challenge',
+                title: 'Recovery Challenge',
+                description: 'Complete a special high-difficulty challenge',
+                difficulty: 'hard',
+                timeRequired: '15-20 minutes'
+            });
+        }
+        
+        return options;
+    }
+    
+    /**
+     * Check for milestone achievements
+     */
+    checkMilestone(days) {
+        const milestones = this.streakConfig.streakMilestones;
+        const achievedMilestone = milestones.find(m => m === days);
+        
+        if (achievedMilestone && !this.hasMilestone(achievedMilestone)) {
+            return {
+                days: achievedMilestone,
+                reward: this.getMilestoneReward(achievedMilestone)
+            };
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Get milestone reward
+     */
+    getMilestoneReward(days) {
+        const rewards = {
+            3: { type: 'badge', name: 'Consistency Starter', xp: 100 },
+            7: { type: 'badge', name: 'Week Warrior', xp: 250, streakFreeze: 1 },
+            14: { type: 'badge', name: 'Fortnight Champion', xp: 500, streakFreeze: 2 },
+            30: { type: 'badge', name: 'Monthly Master', xp: 1000, streakFreeze: 3 },
+            60: { type: 'badge', name: 'Dedication Expert', xp: 2000, streakFreeze: 5 },
+            100: { type: 'badge', name: 'Streak Centurion', xp: 5000, streakFreeze: 10 },
+            365: { type: 'badge', name: 'Year-Long Legend', xp: 10000, streakFreeze: 25 }
+        };
+        
+        return rewards[days] || { type: 'xp', amount: days * 10 };
+    }
+    
+    /**
+     * Get current streak progress
+     */
+    getStreakProgress() {
+        const today = new Date();
+        const todayString = today.toDateString();
+        const lastActivityDate = this.currentStreak.lastActivityDate;
+        
+        let activitiesToday = 0;
+        if (lastActivityDate && new Date(lastActivityDate).toDateString() === todayString) {
+            // Get today's activity count from session storage or API
+            activitiesToday = this.getTodaysActivityCount();
+        }
+        
+        return {
+            currentStreak: this.currentStreak.days,
+            activitiesToday,
+            dailyGoal: this.streakConfig.dailyGoal,
+            progressPercent: Math.min(100, (activitiesToday / this.streakConfig.dailyGoal) * 100),
+            isComplete: activitiesToday >= this.streakConfig.dailyGoal,
+            nextMilestone: this.getNextMilestone(),
+            daysToNextMilestone: this.getDaysToNextMilestone()
+        };
+    }
+    
+    /**
+     * Get motivation message based on streak status
+     */
+    getMotivationMessage() {
+        const progress = this.getStreakProgress();
+        
+        if (progress.currentStreak === 0) {
+            return this.randomMessage(this.motivationMessages.newStreak);
+        }
+        
+        if (this.checkMilestone(progress.currentStreak)) {
+            return this.randomMessage(this.motivationMessages.milestone);
+        }
+        
+        if (progress.isComplete) {
+            return this.randomMessage(this.motivationMessages.continuing);
+        }
+        
+        return `${progress.activitiesToday}/${progress.dailyGoal} activities complete! Keep going! 💪`;
+    }
+    
+    /**
+     * Get current streak data (used by dashboard)
+     */
+    getCurrentStreak() {
+        return {
+            currentStreak: this.currentStreak.days,
+            startDate: this.currentStreak.startDate,
+            totalActivities: this.currentStreak.totalActivities,
+            isActive: this.currentStreak.isActive,
+            lastActivityDate: this.currentStreak.lastActivityDate
+        };
+    }
+
+    /**
+     * Get streak statistics
+     */
+    getStreakStats() {
+        const stats = {
+            current: {
+                days: this.currentStreak.days,
+                startDate: this.currentStreak.startDate,
+                totalActivities: this.currentStreak.totalActivities,
+                isActive: this.currentStreak.isActive
+            },
+            allTime: {
+                longestStreak: this.getLongestStreak(),
+                totalStreaks: this.streakHistory.length + (this.currentStreak.days > 0 ? 1 : 0),
+                milestonesAchieved: this.currentStreak.milestoneRewards.length,
+                totalActivities: this.getTotalActivitiesAllTime(),
+                streakFreezesUsed: this.recoveryOptions.used
+            },
+            thisWeek: this.getWeeklyStats(),
+            thisMonth: this.getMonthlyStats()
+        };
+        
+        return stats;
+    }
+    
+    /**
+     * Helper functions
+     */
+    getDaysDifference(date1, date2) {
+        const msPerDay = 24 * 60 * 60 * 1000;
+        const utc1 = Date.UTC(date1.getFullYear(), date1.getMonth(), date1.getDate());
+        const utc2 = Date.UTC(date2.getFullYear(), date2.getMonth(), date2.getDate());
+        return Math.floor((utc2 - utc1) / msPerDay);
+    }
+    
+    generateStreakId() {
+        return 'streak_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    }
+    
+    randomMessage(messages) {
+        return messages[Math.floor(Math.random() * messages.length)];
+    }
+    
+    hasMilestone(days) {
+        return this.currentStreak.milestoneRewards.some(m => m.days === days);
+    }
+    
+    getNextMilestone() {
+        const milestones = this.streakConfig.streakMilestones;
+        return milestones.find(m => m > this.currentStreak.days) || null;
+    }
+    
+    getDaysToNextMilestone() {
+        const next = this.getNextMilestone();
+        return next ? next - this.currentStreak.days : 0;
+    }
+    
+    getTodaysActivityCount() {
+        // This would typically come from session storage or API
+        const todayKey = new Date().toDateString();
+        return parseInt(sessionStorage.getItem(`ss_activities_${todayKey}`) || '0');
+    }
+    
+    getLongestStreak() {
+        const allStreaks = [...this.streakHistory.map(s => s.daysLasted), this.currentStreak.days];
+        return Math.max(...allStreaks, 0);
+    }
+    
+    getTotalActivitiesAllTime() {
+        const historyActivities = this.streakHistory.reduce((sum, s) => sum + (s.totalActivities || 0), 0);
+        return historyActivities + this.currentStreak.totalActivities;
+    }
+    
+    getWeeklyStats() {
+        // Implementation for weekly statistics
+        return { activeDays: 0, totalActivities: 0 };
+    }
+    
+    getMonthlyStats() {
+        // Implementation for monthly statistics
+        return { activeDays: 0, totalActivities: 0 };
+    }
+    
+    getStreakFreezeTokens() {
+        // Get available streak freeze tokens from milestones
+        return this.currentStreak.milestoneRewards
+            .filter(r => r.reward && r.reward.streakFreeze)
+            .reduce((sum, r) => sum + r.reward.streakFreeze, 0) - this.recoveryOptions.used;
+    }
+    
+    getRecoveryDeadline() {
+        const deadline = new Date();
+        deadline.setHours(deadline.getHours() + this.streakConfig.recoveryTimeWindow);
+        return deadline.toISOString();
+    }
+    
+    /**
+     * Recovery processing functions
+     */
+    async processExtraActivitiesRecovery() {
+        // Mark that user needs to complete double activities
+        sessionStorage.setItem('ss_recovery_mode', JSON.stringify({
+            type: 'extra_activities',
+            required: this.streakConfig.dailyGoal * 2,
+            startTime: Date.now()
+        }));
+        
+        return true; // Recovery option accepted, completion tracked separately
+    }
+    
+    async processStreakFreezeRecovery() {
+        // Use a streak freeze token
+        return true; // Immediate recovery
+    }
+    
+    async processBonusChallengeRecovery() {
+        // Set up bonus challenge mode
+        sessionStorage.setItem('ss_recovery_mode', JSON.stringify({
+            type: 'bonus_challenge',
+            startTime: Date.now()
+        }));
+        
+        return true; // Recovery option accepted, completion tracked separately
+    }
+    
+    /**
+     * Daily check for streak status
+     */
+    checkStreakStatus() {
+        const now = new Date();
+        const lastActivity = this.currentStreak.lastActivityDate;
+        
+        if (!lastActivity) return;
+        
+        const daysSinceActivity = this.getDaysDifference(new Date(lastActivity), now);
+        
+        if (daysSinceActivity > 1 && this.currentStreak.isActive) {
+            // Streak is broken
+            this.handleStreakBreak(daysSinceActivity);
+        }
+    }
+    
+    /**
+     * Start daily monitoring
+     */
+    startDailyCheck() {
+        // Check at midnight every day
+        const now = new Date();
+        const tomorrow = new Date(now);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(0, 5, 0, 0); // 12:05 AM
+        
+        const msUntilMidnight = tomorrow.getTime() - now.getTime();
+        
+        setTimeout(() => {
+            this.checkStreakStatus();
+            // Then check every 24 hours
+            setInterval(() => this.checkStreakStatus(), 24 * 60 * 60 * 1000);
+        }, msUntilMidnight);
+    }
+    
+    /**
+     * API and storage functions
+     */
+    async apiRequest(endpoint, options = {}) {
+        const token = localStorage.getItem('ss_access_token');
+        
+        try {
+            const response = await fetch(`https://trial.cluestoday.com/stop-scrolling${endpoint}`, {
+                method: options.method || 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                    ...options.headers
+                },
+                body: options.body ? JSON.stringify(options.body) : undefined
+            });
+            
+            // Get response text first
+            const responseText = await response.text();
+            
+            // Try to parse as JSON
+            try {
+                return JSON.parse(responseText);
+            } catch (jsonError) {
+                console.error('Non-JSON response from API:', endpoint, responseText.substring(0, 200));
+                return {
+                    success: false,
+                    message: 'Invalid response format from server'
+                };
+            }
+        } catch (error) {
+            console.error('API request failed:', endpoint, error);
+            return {
+                success: false,
+                message: 'Network error'
+            };
+        }
+    }
+    
+    async saveStreakData() {
+        try {
+            await this.apiRequest('/api/v1/streaks/update', {
+                method: 'POST',
+                body: {
+                    streak: this.currentStreak,
+                    recovery: this.recoveryOptions
+                }
+            });
+            
+            // Also save locally as backup
+            this.saveLocalStreakData();
+        } catch (error) {
+            console.error('Failed to save streak data to server:', error);
+            this.saveLocalStreakData();
+        }
+    }
+    
+    saveLocalStreakData() {
+        try {
+            localStorage.setItem('ss_streak_data', JSON.stringify({
+                streak: this.currentStreak,
+                recovery: this.recoveryOptions,
+                history: this.streakHistory.slice(-10) // Keep last 10 only
+            }));
+        } catch (error) {
+            console.error('Failed to save streak data locally:', error);
+        }
+    }
+    
+    loadLocalStreakData() {
+        try {
+            const saved = localStorage.getItem('ss_streak_data');
+            if (saved) {
+                const data = JSON.parse(saved);
+                this.currentStreak = { ...this.currentStreak, ...data.streak };
+                this.recoveryOptions = { ...this.recoveryOptions, ...data.recovery };
+                this.streakHistory = data.history || [];
+            }
+        } catch (error) {
+            console.error('Failed to load local streak data:', error);
+        }
+    }
+    
+    /**
+     * Event system
+     */
+    emit(event, data) {
+        window.dispatchEvent(new CustomEvent(`streak:${event}`, { detail: data }));
+    }
+    
+    /**
+     * Destroy streak manager
+     */
+    destroy() {
+        // Clean up any intervals or timeouts
+        this.saveStreakData();
+    }
+}
+
+// Export for use in other modules
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = StreakManager;
+}

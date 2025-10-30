@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stop Scrolling - System Test</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        .test-pass { color: #10b981; }
+        .test-fail { color: #ef4444; }
+        .test-running { color: #3b82f6; }
+        .console-log { 
+            font-family: monospace; 
+            font-size: 12px; 
+            padding: 2px 4px; 
+            border-left: 2px solid #e5e7eb;
+            margin: 2px 0;
+        }
+        .error-log { 
+            background: #fee; 
+            border-left-color: #ef4444;
+        }
+        .success-log { 
+            background: #f0fdf4; 
+            border-left-color: #10b981;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4">
+    <div class="max-w-4xl mx-auto">
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h1 class="text-2xl font-bold mb-4">Stop Scrolling - Loading Test</h1>
+            <button onclick="runTests()" class="bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700">
+                Run All Tests
+            </button>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-bold mb-4">Test Results</h2>
+            <div id="test-results" class="space-y-2"></div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-bold mb-4">Console Output</h2>
+            <div id="console" class="bg-gray-900 text-gray-100 p-4 rounded max-h-96 overflow-auto"></div>
+        </div>
+    </div>
+
+    <!-- Load all CSS files -->
+    <link rel="stylesheet" href="/stop-scrolling/assets/css/app.css">
+    <link rel="stylesheet" href="/stop-scrolling/assets/css/flow.css">
+    <link rel="stylesheet" href="/stop-scrolling/assets/css/achievements.css">
+    <link rel="stylesheet" href="/stop-scrolling/assets/css/daily-recap.css">
+    <link rel="stylesheet" href="/stop-scrolling/assets/css/settings.css">
+
+    <!-- Load all JavaScript files in order with error tracking -->
+    <script>
+        const scriptLoadErrors = [];
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = () => {
+                    console.log(`✅ Loaded: ${src}`);
+                    resolve();
+                };
+                script.onerror = (e) => {
+                    const error = `❌ Failed to load: ${src}`;
+                    console.error(error);
+                    scriptLoadErrors.push(error);
+                    reject(error);
+                };
+                document.head.appendChild(script);
+            });
+        }
+        
+        // Load scripts sequentially to catch dependency errors
+        async function loadAllScripts() {
+            const cacheBuster = Date.now();
+            const scripts = [
+                '/stop-scrolling/assets/js/games/MemoryGame.js?v=' + cacheBuster,
+                '/stop-scrolling/assets/js/games/PuzzleGame.js?v=' + cacheBuster,
+                '/stop-scrolling/assets/js/games/QuizGame.js?v=' + cacheBuster,
+                '/stop-scrolling/assets/js/games/MeditationPlayer.js?v=' + cacheBuster,
+                '/stop-scrolling/assets/js/SessionManager.js?v=' + cacheBuster,
+                '/stop-scrolling/assets/js/ContentSequencer.js?v=' + cacheBuster,
+                '/stop-scrolling/assets/js/ActivityFlowController.js?v=' + cacheBuster,
+                '/stop-scrolling/assets/js/DifficultyAdapter.js?v=' + cacheBuster,
+                '/stop-scrolling/assets/js/SmartBreakSystem.js?v=' + cacheBuster,
+                '/stop-scrolling/assets/js/PerformanceAnalytics.js?v=' + cacheBuster,
+                '/stop-scrolling/assets/js/StreakManager.js?v=' + cacheBuster,
+                '/stop-scrolling/assets/js/StreakVisualizer.js?v=' + cacheBuster,
+                '/stop-scrolling/assets/js/BadgeSystem.js?v=' + cacheBuster,
+                '/stop-scrolling/assets/js/BadgeVisualizer.js?v=' + cacheBuster,
+                '/stop-scrolling/assets/js/ComboSystem.js?v=' + cacheBuster,
+                '/stop-scrolling/assets/js/AchievementSystem.js?v=' + cacheBuster,
+                '/stop-scrolling/assets/js/MotivationalMessaging.js?v=' + cacheBuster,
+                '/stop-scrolling/assets/js/DailyRecapSystem.js?v=' + cacheBuster,
+                '/stop-scrolling/assets/js/pages/dashboard.js?v=' + cacheBuster,
+                '/stop-scrolling/assets/js/pages/settings.js?v=' + cacheBuster,
+                '/stop-scrolling/assets/js/app.js?v=' + cacheBuster
+            ];
+            
+            for (const script of scripts) {
+                try {
+                    await loadScript(script);
+                } catch (e) {
+                    // Continue loading other scripts even if one fails
+                }
+            }
+            
+            if (scriptLoadErrors.length > 0) {
+                console.error(`${scriptLoadErrors.length} scripts failed to load`);
+            }
+        }
+        
+        loadAllScripts();
+    </script>
+
+    <script>
+        // Capture console errors
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        const originalLog = console.log;
+        const logs = [];
+
+        function addLog(message, type = 'log') {
+            const consoleDiv = document.getElementById('console');
+            const logDiv = document.createElement('div');
+            logDiv.className = `console-log ${type === 'error' ? 'error-log' : type === 'success' ? 'success-log' : ''}`;
+            logDiv.textContent = `[${new Date().toTimeString().split(' ')[0]}] ${message}`;
+            consoleDiv.appendChild(logDiv);
+            logs.push({message, type, time: new Date()});
+        }
+
+        console.error = function(...args) {
+            addLog('ERROR: ' + args.join(' '), 'error');
+            originalError.apply(console, args);
+        };
+
+        console.warn = function(...args) {
+            addLog('WARN: ' + args.join(' '), 'warn');
+            originalWarn.apply(console, args);
+        };
+
+        console.log = function(...args) {
+            // Filter out normal logs, only capture important ones
+            const message = args.join(' ');
+            if (message.includes('error') || message.includes('Error') || 
+                message.includes('fail') || message.includes('undefined') ||
+                message.includes('not found')) {
+                addLog(message, 'log');
+            }
+            originalLog.apply(console, args);
+        };
+
+        // Capture unhandled errors
+        window.addEventListener('error', (e) => {
+            addLog(`Unhandled Error: ${e.message} at ${e.filename}:${e.lineno}:${e.colno}`, 'error');
+        });
+
+        window.addEventListener('unhandledrejection', (e) => {
+            addLog(`Unhandled Promise Rejection: ${e.reason}`, 'error');
+        });
+
+        async function runTests() {
+            const results = document.getElementById('test-results');
+            results.innerHTML = '';
+            document.getElementById('console').innerHTML = '';
+            
+            addLog('Starting comprehensive tests...', 'success');
+            
+            // Wait for scripts to load
+            addLog('Waiting for all scripts to load...', 'info');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Check for script loading errors
+            if (scriptLoadErrors.length > 0) {
+                addLog(`⚠️ ${scriptLoadErrors.length} script(s) failed to load:`, 'error');
+                scriptLoadErrors.forEach(err => addLog(err, 'error'));
+            } else {
+                addLog('✅ All scripts loaded successfully', 'success');
+            }
+
+            const tests = [
+                // CSS Loading Tests
+                { name: 'Main CSS', test: () => document.querySelector('link[href*="app.css"]') !== null },
+                { name: 'Flow CSS', test: () => document.querySelector('link[href*="flow.css"]') !== null },
+                { name: 'Achievements CSS', test: () => document.querySelector('link[href*="achievements.css"]') !== null },
+                
+                // Core JavaScript Components
+                { name: 'App Configuration', test: () => typeof APP_CONFIG !== 'undefined' },
+                { name: 'App State', test: () => typeof AppState !== 'undefined' },
+                
+                // Game Engines
+                { name: 'MemoryGame Engine', test: () => typeof MemoryGame === 'function' },
+                { name: 'PuzzleGame Engine', test: () => typeof PuzzleGame === 'function' },
+                { name: 'QuizGame Engine', test: () => typeof QuizGame === 'function' },
+                { name: 'MeditationPlayer Engine', test: () => typeof MeditationPlayer === 'function' },
+                
+                // Flow Components
+                { name: 'SessionManager', test: () => typeof SessionManager === 'function' },
+                { name: 'ContentSequencer', test: () => typeof ContentSequencer === 'function' },
+                { name: 'ActivityFlowController', test: () => typeof ActivityFlowController === 'function' },
+                { name: 'DifficultyAdapter', test: () => typeof DifficultyAdapter === 'function' },
+                { name: 'SmartBreakSystem', test: () => typeof SmartBreakSystem === 'function' },
+                { name: 'PerformanceAnalytics', test: () => typeof PerformanceAnalytics === 'function' },
+                
+                // Engagement Systems
+                { name: 'StreakManager', test: () => typeof StreakManager === 'function' },
+                { name: 'BadgeSystem', test: () => typeof BadgeSystem === 'function' },
+                { name: 'AchievementSystem', test: () => typeof AchievementSystem === 'function' },
+                { name: 'MotivationalMessaging', test: () => typeof MotivationalMessaging === 'function' },
+                { name: 'DailyRecapSystem', test: () => typeof DailyRecapSystem === 'function' },
+                
+                // Page Functions
+                { name: 'Dashboard Page', test: () => typeof renderDashboard === 'function' },
+                { name: 'Settings Page', test: () => typeof renderSettings === 'function' },
+                { name: 'Login Function', test: () => typeof renderLogin === 'function' },
+                { name: 'Register Function', test: () => typeof renderRegister === 'function' },
+                
+                // API Functions
+                { name: 'API Request Function', test: () => typeof apiRequest === 'function' },
+                { name: 'Navigate Function', test: () => typeof navigateTo === 'function' },
+                
+                // Game Instantiation Tests
+                { 
+                    name: 'MemoryGame Instantiation', 
+                    test: () => {
+                        try {
+                            if (typeof MemoryGame !== 'function') {
+                                addLog('MemoryGame is not a function', 'error');
+                                return false;
+                            }
+                            const testDiv = document.createElement('div');
+                            testDiv.id = 'test-memory-game';
+                            document.body.appendChild(testDiv);
+                            const game = new MemoryGame('card-matching', 'easy', testDiv);
+                            document.body.removeChild(testDiv);
+                            return true;
+                        } catch (e) {
+                            addLog(`MemoryGame instantiation error: ${e.message}\nStack: ${e.stack}`, 'error');
+                            return false;
+                        }
+                    }
+                },
+                { 
+                    name: 'PuzzleGame Instantiation', 
+                    test: () => {
+                        try {
+                            if (typeof PuzzleGame !== 'function') {
+                                addLog('PuzzleGame is not a function', 'error');
+                                return false;
+                            }
+                            const testDiv = document.createElement('div');
+                            testDiv.id = 'test-puzzle-game';
+                            document.body.appendChild(testDiv);
+                            const game = new PuzzleGame('sliding-puzzle', 'easy', testDiv);
+                            document.body.removeChild(testDiv);
+                            return true;
+                        } catch (e) {
+                            addLog(`PuzzleGame instantiation error: ${e.message}\nStack: ${e.stack}`, 'error');
+                            return false;
+                        }
+                    }
+                },
+                
+                // Flow System Tests
+                { 
+                    name: 'SessionManager Instantiation', 
+                    test: () => {
+                        try {
+                            if (typeof SessionManager !== 'function') {
+                                addLog('SessionManager is not a function', 'error');
+                                return false;
+                            }
+                            const sm = new SessionManager();
+                            return true;
+                        } catch (e) {
+                            addLog(`SessionManager error: ${e.message}\nStack: ${e.stack}`, 'error');
+                            return false;
+                        }
+                    }
+                },
+                { 
+                    name: 'ContentSequencer Instantiation', 
+                    test: () => {
+                        try {
+                            if (typeof ContentSequencer !== 'function') {
+                                addLog('ContentSequencer is not a function', 'error');
+                                return false;
+                            }
+                            const cs = new ContentSequencer();
+                            return true;
+                        } catch (e) {
+                            addLog(`ContentSequencer error: ${e.message}\nStack: ${e.stack}`, 'error');
+                            return false;
+                        }
+                    }
+                },
+                { 
+                    name: 'Flow Controller Integration', 
+                    test: () => {
+                        try {
+                            if (typeof SessionManager !== 'function' || typeof ContentSequencer !== 'function' || typeof ActivityFlowController !== 'function') {
+                                addLog('One or more flow components not loaded', 'error');
+                                return false;
+                            }
+                            const sm = new SessionManager();
+                            const cs = new ContentSequencer();
+                            const flow = new ActivityFlowController(sm, cs);
+                            return true;
+                        } catch (e) {
+                            addLog(`Flow Integration error: ${e.message}\nStack: ${e.stack}`, 'error');
+                            return false;
+                        }
+                    }
+                }
+            ];
+
+            let passed = 0;
+            let failed = 0;
+
+            for (const test of tests) {
+                const result = document.createElement('div');
+                result.className = 'flex justify-between items-center p-2 border-b';
+                
+                try {
+                    const success = test.test();
+                    if (success) {
+                        result.innerHTML = `
+                            <span>${test.name}</span>
+                            <span class="test-pass">✅ PASS</span>
+                        `;
+                        passed++;
+                    } else {
+                        result.innerHTML = `
+                            <span>${test.name}</span>
+                            <span class="test-fail">❌ FAIL</span>
+                        `;
+                        failed++;
+                        addLog(`Test failed: ${test.name}`, 'error');
+                    }
+                } catch (e) {
+                    result.innerHTML = `
+                        <span>${test.name}</span>
+                        <span class="test-fail">❌ ERROR: ${e.message}</span>
+                    `;
+                    failed++;
+                    addLog(`Test error in ${test.name}: ${e.message}`, 'error');
+                }
+                
+                results.appendChild(result);
+            }
+
+            // Test API endpoints
+            addLog('Testing API endpoints...', 'success');
+            
+            const apiTests = [
+                { name: 'Auth Login API', url: '/stop-scrolling/api/v1/auth/login', method: 'POST', body: {email: 'test@test.com', password: 'test'} },
+                { name: 'Contents API', url: '/stop-scrolling/api/v1/contents', method: 'GET' },
+                { name: 'Activities History API', url: '/stop-scrolling/api/v1/activities/history', method: 'GET' },
+                { name: 'Sessions API', url: '/stop-scrolling/api/v1/sessions', method: 'GET' },
+                { name: 'Achievements API', url: '/stop-scrolling/api/v1/achievements/progress', method: 'GET' }
+            ];
+
+            for (const apiTest of apiTests) {
+                const result = document.createElement('div');
+                result.className = 'flex justify-between items-center p-2 border-b';
+                
+                try {
+                    const options = {
+                        method: apiTest.method,
+                        headers: { 'Content-Type': 'application/json' }
+                    };
+                    
+                    if (apiTest.body) {
+                        options.body = JSON.stringify(apiTest.body);
+                    }
+                    
+                    const response = await fetch(apiTest.url, options);
+                    const contentType = response.headers.get('content-type');
+                    
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        result.innerHTML = `
+                            <span>${apiTest.name}</span>
+                            <span class="test-pass">✅ PASS (${response.status})</span>
+                        `;
+                        passed++;
+                    } else {
+                        result.innerHTML = `
+                            <span>${apiTest.name}</span>
+                            <span class="test-fail">❌ Not JSON</span>
+                        `;
+                        failed++;
+                        addLog(`${apiTest.name} returned non-JSON response`, 'error');
+                    }
+                } catch (e) {
+                    result.innerHTML = `
+                        <span>${apiTest.name}</span>
+                        <span class="test-fail">❌ ${e.message}</span>
+                    `;
+                    failed++;
+                    addLog(`API test error ${apiTest.name}: ${e.message}`, 'error');
+                }
+                
+                results.appendChild(result);
+            }
+
+            // Summary
+            const summary = document.createElement('div');
+            summary.className = 'mt-4 p-4 bg-gray-100 rounded font-bold text-lg';
+            summary.innerHTML = `
+                Total: ${passed + failed} | 
+                <span class="test-pass">Passed: ${passed}</span> | 
+                <span class="test-fail">Failed: ${failed}</span>
+            `;
+            results.appendChild(summary);
+
+            if (failed === 0) {
+                addLog('✅ All tests passed successfully!', 'success');
+            } else {
+                addLog(`⚠️ ${failed} tests failed. Check console for details.`, 'error');
+            }
+        }
+
+        // Add localStorage polyfill for testing
+        if (!window.localStorage) {
+            window.localStorage = {
+                data: {},
+                getItem: function(key) { return this.data[key] || null; },
+                setItem: function(key, value) { this.data[key] = value; },
+                removeItem: function(key) { delete this.data[key]; },
+                clear: function() { this.data = {}; }
+            };
+        }
+        
+        // Run tests automatically after page loads
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                addLog('Page loaded. Ready to run tests.', 'success');
+                // Check for any immediate loading errors
+                if (logs.filter(l => l.type === 'error').length > 0) {
+                    addLog(`⚠️ ${logs.filter(l => l.type === 'error').length} errors detected during page load`, 'error');
+                }
+                
+                // Show loading status
+                addLog(`Scripts loading status: ${scriptLoadErrors.length === 0 ? '✅ All loaded' : `❌ ${scriptLoadErrors.length} failed`}`, 
+                      scriptLoadErrors.length === 0 ? 'success' : 'error');
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

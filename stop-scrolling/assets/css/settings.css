@@ -1,0 +1,216 @@
+/* Settings Page Styles */
+
+/* Settings Tabs */
+.settings-tab {
+    border-bottom: 2px solid transparent;
+    padding: 1rem 0.5rem;
+    margin-bottom: -2px;
+    font-weight: 500;
+    color: #6b7280;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    outline: none;
+}
+
+.settings-tab:hover {
+    color: #4f46e5;
+    border-bottom-color: #e0e7ff;
+}
+
+.settings-tab.active {
+    color: #4f46e5;
+    border-bottom-color: #4f46e5;
+}
+
+/* Settings Content */
+.settings-content {
+    display: none;
+}
+
+.settings-content.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Form Groups */
+.settings-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.settings-label {
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.875rem;
+}
+
+.settings-description {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
+}
+
+/* Form Inputs */
+.settings-input,
+.settings-select {
+    padding: 0.75rem 1rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+    background-color: white;
+}
+
+.settings-input:focus,
+.settings-select:focus {
+    outline: none;
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.settings-input:disabled {
+    background-color: #f9fafb;
+    color: #6b7280;
+    cursor: not-allowed;
+}
+
+/* Checkbox Styles */
+.settings-checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+}
+
+.settings-checkbox {
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 2px solid #d1d5db;
+    border-radius: 0.25rem;
+    background-color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.settings-checkbox:checked {
+    background-color: #4f46e5;
+    border-color: #4f46e5;
+}
+
+.settings-checkbox:checked::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+.settings-checkbox:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+/* Checkbox Grid */
+.settings-checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+/* Buttons */
+.settings-button {
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    border: 1px solid transparent;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.settings-button-primary {
+    background-color: #e5e7eb;
+    color: #6b7280;
+    border-color: #e5e7eb;
+}
+
+.settings-button-primary-active,
+.settings-button-primary:hover {
+    background-color: #4f46e5;
+    color: white;
+    border-color: #4f46e5;
+}
+
+.settings-button-secondary {
+    background-color: white;
+    color: #374151;
+    border-color: #d1d5db;
+}
+
+.settings-button-secondary:hover {
+    background-color: #f9fafb;
+    border-color: #9ca3af;
+}
+
+.settings-button-danger {
+    background-color: white;
+    color: #dc2626;
+    border-color: #dc2626;
+}
+
+.settings-button-danger:hover {
+    background-color: #dc2626;
+    color: white;
+}
+
+/* Mobile Responsive */
+
+/* Dark Theme Support */
+
+/* Animation for unsaved changes indicator */
+.text-orange-600 {
+    animation: pulse 2s infinite;
+}
+
+.text-green-600 {
+    animation: fadeInGreen 0.3s ease;
+}
+
+@keyframes fadeInGreen {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Smooth transitions for tab switching */
+.settings-content {
+    transition: all 0.3s ease;
+}
+
+/* Focus styles for accessibility */
+.settings-tab:focus {
+    outline: 2px solid #4f46e5;
+    outline-offset: 2px;
+}
+
+.settings-button:focus {
+    outline: 2px solid #4f46e5;
+    outline-offset: 2px;
+}

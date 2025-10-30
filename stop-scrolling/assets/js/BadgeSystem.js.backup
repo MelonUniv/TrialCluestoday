@@ -1,0 +1,843 @@
+/**
+ * BadgeSystem.js
+ * Comprehensive badge and achievement system for category mastery
+ * Tracks progress across different cognitive categories and awards specialized badges
+ */
+
+class BadgeSystem {
+    constructor() {
+        // Category definitions
+        this.categories = {
+            memory_game: {
+                name: 'Memory Games',
+                icon: '🧠',
+                description: 'Test and improve your memory skills',
+                color: '#8b5cf6'
+            },
+            puzzle: {
+                name: 'Puzzles',
+                icon: '🧩',
+                description: 'Solve complex logic puzzles',
+                color: '#06b6d4'
+            },
+            trivia: {
+                name: 'Trivia',
+                icon: '🎯',
+                description: 'Test your knowledge across topics',
+                color: '#10b981'
+            },
+            meditation: {
+                name: 'Meditation',
+                icon: '🧘',
+                description: 'Practice mindfulness and focus',
+                color: '#f59e0b'
+            },
+            challenge: {
+                name: 'Challenges',
+                icon: '⚡',
+                description: 'Take on special challenges',
+                color: '#ef4444'
+            }
+        };
+        
+        // Badge tiers and requirements
+        this.badgeTiers = {
+            bronze: {
+                name: 'Bronze',
+                color: '#cd7f32',
+                requirements: { activities: 10, accuracy: 0.6, time: 7 * 24 * 60 * 60 * 1000 }, // 7 days
+                icon: '🥉'
+            },
+            silver: {
+                name: 'Silver',
+                color: '#c0c0c0',
+                requirements: { activities: 25, accuracy: 0.7, time: 14 * 24 * 60 * 60 * 1000 }, // 14 days
+                icon: '🥈'
+            },
+            gold: {
+                name: 'Gold',
+                color: '#ffd700',
+                requirements: { activities: 50, accuracy: 0.8, time: 30 * 24 * 60 * 60 * 1000 }, // 30 days
+                icon: '🥇'
+            },
+            platinum: {
+                name: 'Platinum',
+                color: '#e5e4e2',
+                requirements: { activities: 100, accuracy: 0.85, time: 60 * 24 * 60 * 60 * 1000 }, // 60 days
+                icon: '💎'
+            },
+            diamond: {
+                name: 'Diamond',
+                color: '#b9f2ff',
+                requirements: { activities: 250, accuracy: 0.9, time: 120 * 24 * 60 * 60 * 1000 }, // 120 days
+                icon: '💠'
+            },
+            legendary: {
+                name: 'Legendary',
+                color: '#ff6b6b',
+                requirements: { activities: 500, accuracy: 0.95, time: 365 * 24 * 60 * 60 * 1000 }, // 365 days
+                icon: '👑'
+            }
+        };
+        
+        // Special achievement badges
+        this.specialBadges = {
+            perfectionist: {
+                name: 'Perfectionist',
+                description: 'Achieve 100% accuracy in 10 consecutive activities',
+                icon: '💯',
+                color: '#10b981',
+                type: 'achievement'
+            },
+            speedster: {
+                name: 'Speed Demon',
+                description: 'Complete activities 50% faster than average',
+                icon: '⚡',
+                color: '#f59e0b',
+                type: 'achievement'
+            },
+            endurance: {
+                name: 'Endurance Master',
+                description: 'Complete 20 activities in a single session',
+                icon: '🏃‍♂️',
+                color: '#ef4444',
+                type: 'achievement'
+            },
+            comeback: {
+                name: 'Comeback Kid',
+                description: 'Improve accuracy by 30% over 7 days',
+                icon: '📈',
+                color: '#06b6d4',
+                type: 'achievement'
+            },
+            variety: {
+                name: 'Jack of All Trades',
+                description: 'Earn bronze badges in all categories',
+                icon: '🎭',
+                color: '#8b5cf6',
+                type: 'achievement'
+            },
+            dedication: {
+                name: 'Dedication Award',
+                description: 'Complete activities for 30 consecutive days',
+                icon: '🏆',
+                color: '#cd7f32',
+                type: 'streak'
+            },
+            explorer: {
+                name: 'Content Explorer',
+                description: 'Try 50 different activities',
+                icon: '🗺️',
+                color: '#10b981',
+                type: 'variety'
+            },
+            teacher: {
+                name: 'Teacher\'s Pet',
+                description: 'Help improve difficulty recommendations',
+                icon: '👨‍🏫',
+                color: '#f59e0b',
+                type: 'contribution'
+            }
+        };
+        
+        // User badge progress
+        this.userProgress = {};
+        this.earnedBadges = [];
+        this.pendingBadges = [];
+        
+        this.init();
+    }
+    
+    async init() {
+        await this.loadUserProgress();
+        this.bindEvents();
+    }
+    
+    /**
+     * Load user's current badge progress
+     */
+    async loadUserProgress() {
+        try {
+            const response = await this.apiRequest('/api/v1/badges/progress');
+            
+            if (response.success && response.data) {
+                this.userProgress = response.data.progress || {};
+                this.earnedBadges = response.data.earned || [];
+                this.updateBadgeProgress();
+            }
+        } catch (error) {
+            console.error('Failed to load badge progress:', error);
+            this.loadLocalProgress();
+        }
+    }
+    
+    /**
+     * Track activity completion for badge progress
+     */
+    async trackActivity(activityData) {
+        const category = activityData.category;
+        const accuracy = activityData.accuracy || 0;
+        const duration = activityData.duration || 0;
+        const timestamp = new Date().getTime();
+        
+        // Initialize category progress if not exists
+        if (!this.userProgress[category]) {
+            this.userProgress[category] = {
+                activities: 0,
+                totalAccuracy: 0,
+                totalTime: 0,
+                firstActivity: timestamp,
+                lastActivity: timestamp,
+                bestAccuracy: 0,
+                perfectStreaks: [],
+                currentPerfectStreak: 0,
+                speedRecords: []
+            };
+        }
+        
+        const progress = this.userProgress[category];
+        
+        // Update progress
+        progress.activities++;
+        progress.totalAccuracy += accuracy;
+        progress.totalTime += duration;
+        progress.lastActivity = timestamp;
+        progress.bestAccuracy = Math.max(progress.bestAccuracy, accuracy);
+        
+        // Track perfect streak
+        if (accuracy === 1.0) {
+            progress.currentPerfectStreak++;
+        } else {
+            if (progress.currentPerfectStreak > 0) {
+                progress.perfectStreaks.push({
+                    length: progress.currentPerfectStreak,
+                    endDate: timestamp
+                });
+                progress.currentPerfectStreak = 0;
+            }
+        }
+        
+        // Track speed records
+        const avgSpeed = this.calculateAverageSpeed(category);
+        if (duration > 0 && avgSpeed > 0) {
+            const speedImprovement = (avgSpeed - duration) / avgSpeed;
+            if (speedImprovement > 0.5) { // 50% faster
+                progress.speedRecords.push({
+                    improvement: speedImprovement,
+                    duration: duration,
+                    date: timestamp
+                });
+            }
+        }
+        
+        // Check for new badges
+        const newBadges = await this.checkForNewBadges(category);
+        
+        // Save progress
+        await this.saveProgress();
+        
+        // Emit events for new badges
+        if (newBadges.length > 0) {
+            this.emit('badgesEarned', newBadges);
+        }
+        
+        return {
+            newBadges,
+            progress: this.getCategoryProgress(category)
+        };
+    }
+    
+    /**
+     * Check for newly earned badges
+     */
+    async checkForNewBadges(category) {
+        const newBadges = [];
+        
+        // Check category mastery badges
+        const categoryBadges = this.checkCategoryBadges(category);
+        newBadges.push(...categoryBadges);
+        
+        // Check special achievement badges
+        const specialBadges = this.checkSpecialBadges();
+        newBadges.push(...specialBadges);
+        
+        // Filter out already earned badges
+        const uniqueNewBadges = newBadges.filter(badge => 
+            !this.hasBadge(badge.id)
+        );
+        
+        // Add to earned badges
+        uniqueNewBadges.forEach(badge => {
+            badge.earnedDate = new Date().toISOString();
+            this.earnedBadges.push(badge);
+        });
+        
+        return uniqueNewBadges;
+    }
+    
+    /**
+     * Check category-specific mastery badges
+     */
+    checkCategoryBadges(category) {
+        const badges = [];
+        const progress = this.userProgress[category];
+        
+        if (!progress) return badges;
+        
+        const avgAccuracy = progress.totalAccuracy / progress.activities;
+        const timeSpent = progress.lastActivity - progress.firstActivity;
+        
+        // Check each tier
+        Object.entries(this.badgeTiers).forEach(([tier, requirements]) => {
+            const badgeId = `${category}_${tier}`;
+            
+            if (this.hasBadge(badgeId)) return;
+            
+            const meetsRequirements = (
+                progress.activities >= requirements.activities &&
+                avgAccuracy >= requirements.accuracy &&
+                timeSpent >= requirements.time
+            );
+            
+            if (meetsRequirements) {
+                badges.push({
+                    id: badgeId,
+                    name: `${this.categories[category].name} ${requirements.name}`,
+                    description: `${requirements.name} mastery in ${this.categories[category].name}`,
+                    icon: this.categories[category].icon,
+                    tier: tier,
+                    category: category,
+                    color: requirements.color,
+                    type: 'mastery',
+                    requirements: {
+                        activities: requirements.activities,
+                        accuracy: Math.round(requirements.accuracy * 100),
+                        timeRequired: this.formatDuration(requirements.time)
+                    },
+                    userStats: {
+                        activities: progress.activities,
+                        accuracy: Math.round(avgAccuracy * 100),
+                        timeSpent: this.formatDuration(timeSpent)
+                    }
+                });
+            }
+        });
+        
+        return badges;
+    }
+    
+    /**
+     * Check special achievement badges
+     */
+    checkSpecialBadges() {
+        const badges = [];
+        
+        // Perfectionist badge
+        const perfectStreak = this.getLongestPerfectStreak();
+        if (perfectStreak >= 10 && !this.hasBadge('perfectionist')) {
+            badges.push({
+                ...this.specialBadges.perfectionist,
+                id: 'perfectionist',
+                streak: perfectStreak
+            });
+        }
+        
+        // Speed demon badge
+        const speedRecords = this.getTotalSpeedRecords();
+        if (speedRecords >= 10 && !this.hasBadge('speedster')) {
+            badges.push({
+                ...this.specialBadges.speedster,
+                id: 'speedster',
+                records: speedRecords
+            });
+        }
+        
+        // Endurance master badge
+        const maxSession = this.getMaxSessionActivities();
+        if (maxSession >= 20 && !this.hasBadge('endurance')) {
+            badges.push({
+                ...this.specialBadges.endurance,
+                id: 'endurance',
+                maxSession: maxSession
+            });
+        }
+        
+        // Comeback kid badge
+        const improvementStory = this.getAccuracyImprovement();
+        if (improvementStory.improvement >= 0.3 && !this.hasBadge('comeback')) {
+            badges.push({
+                ...this.specialBadges.comeback,
+                id: 'comeback',
+                improvement: Math.round(improvementStory.improvement * 100)
+            });
+        }
+        
+        // Jack of all trades badge
+        const bronzeBadges = this.countBadgesByTier('bronze');
+        const totalCategories = Object.keys(this.categories).length;
+        if (bronzeBadges >= totalCategories && !this.hasBadge('variety')) {
+            badges.push({
+                ...this.specialBadges.variety,
+                id: 'variety',
+                categoriesCompleted: bronzeBadges
+            });
+        }
+        
+        // Explorer badge
+        const uniqueActivities = this.getUniqueActivitiesCount();
+        if (uniqueActivities >= 50 && !this.hasBadge('explorer')) {
+            badges.push({
+                ...this.specialBadges.explorer,
+                id: 'explorer',
+                activitiesExplored: uniqueActivities
+            });
+        }
+        
+        return badges;
+    }
+    
+    /**
+     * Get user's badge collection
+     */
+    getBadgeCollection() {
+        const collection = {
+            total: this.earnedBadges.length,
+            byCategory: {},
+            byTier: {},
+            special: [],
+            recent: [],
+            missing: this.getMissingBadges()
+        };
+        
+        // Group badges by category and tier
+        this.earnedBadges.forEach(badge => {
+            if (badge.category) {
+                if (!collection.byCategory[badge.category]) {
+                    collection.byCategory[badge.category] = [];
+                }
+                collection.byCategory[badge.category].push(badge);
+            }
+            
+            if (badge.tier) {
+                if (!collection.byTier[badge.tier]) {
+                    collection.byTier[badge.tier] = [];
+                }
+                collection.byTier[badge.tier].push(badge);
+            }
+            
+            if (badge.type !== 'mastery') {
+                collection.special.push(badge);
+            }
+        });
+        
+        // Get recent badges (last 30 days)
+        const thirtyDaysAgo = new Date().getTime() - (30 * 24 * 60 * 60 * 1000);
+        collection.recent = this.earnedBadges.filter(badge => 
+            new Date(badge.earnedDate).getTime() > thirtyDaysAgo
+        ).sort((a, b) => new Date(b.earnedDate) - new Date(a.earnedDate));
+        
+        return collection;
+    }
+    
+    /**
+     * Get progress towards next badges
+     */
+    getNextBadgeProgress() {
+        const nextBadges = [];
+        
+        // Check progress for each category
+        Object.keys(this.categories).forEach(category => {
+            const nextBadge = this.getNextCategoryBadge(category);
+            if (nextBadge) {
+                nextBadges.push(nextBadge);
+            }
+        });
+        
+        // Check progress for special badges
+        const specialProgress = this.getSpecialBadgeProgress();
+        nextBadges.push(...specialProgress);
+        
+        // Sort by completion percentage
+        nextBadges.sort((a, b) => b.progress - a.progress);
+        
+        return nextBadges;
+    }
+    
+    /**
+     * Get next category badge progress
+     */
+    getNextCategoryBadge(category) {
+        const progress = this.userProgress[category];
+        
+        if (!progress) {
+            // First badge in category
+            const bronzeReqs = this.badgeTiers.bronze.requirements;
+            return {
+                category,
+                name: `${this.categories[category].name} Bronze`,
+                icon: this.categories[category].icon,
+                tier: 'bronze',
+                requirements: bronzeReqs,
+                current: {
+                    activities: 0,
+                    accuracy: 0,
+                    timeSpent: 0
+                },
+                progress: 0,
+                nextMilestone: 'activities'
+            };
+        }
+        
+        const avgAccuracy = progress.totalAccuracy / progress.activities;
+        const timeSpent = progress.lastActivity - progress.firstActivity;
+        
+        // Find next tier
+        const currentTiers = Object.keys(this.badgeTiers);
+        let nextTier = null;
+        
+        for (const tier of currentTiers) {
+            const badgeId = `${category}_${tier}`;
+            if (!this.hasBadge(badgeId)) {
+                nextTier = tier;
+                break;
+            }
+        }
+        
+        if (!nextTier) return null; // All badges earned
+        
+        const requirements = this.badgeTiers[nextTier].requirements;
+        const current = {
+            activities: progress.activities,
+            accuracy: Math.round(avgAccuracy * 100),
+            timeSpent: timeSpent
+        };
+        
+        // Calculate progress percentage
+        const progressPoints = [
+            Math.min(1, progress.activities / requirements.activities),
+            Math.min(1, avgAccuracy / requirements.accuracy),
+            Math.min(1, timeSpent / requirements.time)
+        ];
+        const overallProgress = Math.round((progressPoints.reduce((a, b) => a + b) / 3) * 100);
+        
+        // Determine next milestone
+        let nextMilestone = 'complete';
+        if (progressPoints[0] < 1) nextMilestone = 'activities';
+        else if (progressPoints[1] < 1) nextMilestone = 'accuracy';
+        else if (progressPoints[2] < 1) nextMilestone = 'time';
+        
+        return {
+            category,
+            name: `${this.categories[category].name} ${this.badgeTiers[nextTier].name}`,
+            icon: this.categories[category].icon,
+            tier: nextTier,
+            requirements: {
+                activities: requirements.activities,
+                accuracy: Math.round(requirements.accuracy * 100),
+                timeRequired: this.formatDuration(requirements.time)
+            },
+            current,
+            progress: overallProgress,
+            nextMilestone,
+            progressBreakdown: {
+                activities: Math.round(progressPoints[0] * 100),
+                accuracy: Math.round(progressPoints[1] * 100),
+                time: Math.round(progressPoints[2] * 100)
+            }
+        };
+    }
+    
+    /**
+     * Get special badge progress
+     */
+    getSpecialBadgeProgress() {
+        const progress = [];
+        
+        // Perfectionist progress
+        if (!this.hasBadge('perfectionist')) {
+            const perfectStreak = this.getLongestPerfectStreak();
+            progress.push({
+                id: 'perfectionist',
+                name: 'Perfectionist',
+                icon: '💯',
+                description: 'Achieve 100% accuracy in 10 consecutive activities',
+                current: perfectStreak,
+                required: 10,
+                progress: Math.round((perfectStreak / 10) * 100),
+                type: 'special'
+            });
+        }
+        
+        // Speed demon progress
+        if (!this.hasBadge('speedster')) {
+            const speedRecords = this.getTotalSpeedRecords();
+            progress.push({
+                id: 'speedster',
+                name: 'Speed Demon',
+                icon: '⚡',
+                description: 'Complete activities 50% faster than average',
+                current: speedRecords,
+                required: 10,
+                progress: Math.round((speedRecords / 10) * 100),
+                type: 'special'
+            });
+        }
+        
+        // Explorer progress
+        if (!this.hasBadge('explorer')) {
+            const uniqueActivities = this.getUniqueActivitiesCount();
+            progress.push({
+                id: 'explorer',
+                name: 'Content Explorer',
+                icon: '🗺️',
+                description: 'Try 50 different activities',
+                current: uniqueActivities,
+                required: 50,
+                progress: Math.round((uniqueActivities / 50) * 100),
+                type: 'special'
+            });
+        }
+        
+        return progress.filter(p => p.progress < 100);
+    }
+    
+    /**
+     * Utility functions
+     */
+    hasBadge(badgeId) {
+        return this.earnedBadges.some(badge => badge.id === badgeId);
+    }
+    
+    getCategoryProgress(category) {
+        const progress = this.userProgress[category];
+        if (!progress) return null;
+        
+        const avgAccuracy = progress.totalAccuracy / progress.activities;
+        const timeSpent = progress.lastActivity - progress.firstActivity;
+        
+        return {
+            activities: progress.activities,
+            accuracy: Math.round(avgAccuracy * 100),
+            timeSpent: this.formatDuration(timeSpent),
+            bestAccuracy: Math.round(progress.bestAccuracy * 100),
+            perfectStreak: progress.currentPerfectStreak,
+            speedRecords: progress.speedRecords.length
+        };
+    }
+    
+    calculateAverageSpeed(category) {
+        const progress = this.userProgress[category];
+        if (!progress || progress.activities === 0) return 0;
+        
+        return progress.totalTime / progress.activities;
+    }
+    
+    getLongestPerfectStreak() {
+        let longest = 0;
+        
+        Object.values(this.userProgress).forEach(progress => {
+            longest = Math.max(longest, progress.currentPerfectStreak);
+            progress.perfectStreaks?.forEach(streak => {
+                longest = Math.max(longest, streak.length);
+            });
+        });
+        
+        return longest;
+    }
+    
+    getTotalSpeedRecords() {
+        let total = 0;
+        
+        Object.values(this.userProgress).forEach(progress => {
+            total += progress.speedRecords?.length || 0;
+        });
+        
+        return total;
+    }
+    
+    getMaxSessionActivities() {
+        // This would typically come from session tracking
+        // For now, return a placeholder value
+        return 0;
+    }
+    
+    getAccuracyImprovement() {
+        // Calculate improvement over the last 7 days
+        // This is a simplified version
+        return { improvement: 0 };
+    }
+    
+    countBadgesByTier(tier) {
+        return this.earnedBadges.filter(badge => badge.tier === tier).length;
+    }
+    
+    getUniqueActivitiesCount() {
+        // This would typically track unique content IDs
+        // For now, return total activities / 2 as estimate
+        let totalActivities = 0;
+        Object.values(this.userProgress).forEach(progress => {
+            totalActivities += progress.activities;
+        });
+        return Math.floor(totalActivities / 2);
+    }
+    
+    getMissingBadges() {
+        const missing = [];
+        
+        // Category badges
+        Object.keys(this.categories).forEach(category => {
+            Object.keys(this.badgeTiers).forEach(tier => {
+                const badgeId = `${category}_${tier}`;
+                if (!this.hasBadge(badgeId)) {
+                    missing.push({
+                        id: badgeId,
+                        name: `${this.categories[category].name} ${this.badgeTiers[tier].name}`,
+                        category,
+                        tier,
+                        icon: this.categories[category].icon,
+                        type: 'mastery'
+                    });
+                }
+            });
+        });
+        
+        // Special badges
+        Object.entries(this.specialBadges).forEach(([id, badge]) => {
+            if (!this.hasBadge(id)) {
+                missing.push({
+                    ...badge,
+                    id
+                });
+            }
+        });
+        
+        return missing;
+    }
+    
+    formatDuration(ms) {
+        const days = Math.floor(ms / (24 * 60 * 60 * 1000));
+        const hours = Math.floor((ms % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+        
+        if (days > 0) {
+            return `${days} day${days !== 1 ? 's' : ''}`;
+        } else if (hours > 0) {
+            return `${hours} hour${hours !== 1 ? 's' : ''}`;
+        } else {
+            return 'Less than an hour';
+        }
+    }
+    
+    /**
+     * API and storage functions
+     */
+    async apiRequest(endpoint, options = {}) {
+        const token = localStorage.getItem('ss_access_token');
+        
+        const response = await fetch(`https://trial.cluestoday.com/stop-scrolling${endpoint}`, {
+            method: options.method || 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                ...options.headers
+            },
+            body: options.body ? JSON.stringify(options.body) : undefined
+        });
+        
+        return await response.json();
+    }
+    
+    async saveProgress() {
+        try {
+            await this.apiRequest('/api/v1/badges/update', {
+                method: 'POST',
+                body: {
+                    progress: this.userProgress,
+                    earned: this.earnedBadges
+                }
+            });
+            
+            // Also save locally as backup
+            this.saveLocalProgress();
+        } catch (error) {
+            console.error('Failed to save badge progress:', error);
+            this.saveLocalProgress();
+        }
+    }
+    
+    saveLocalProgress() {
+        try {
+            localStorage.setItem('ss_badge_progress', JSON.stringify({
+                progress: this.userProgress,
+                earned: this.earnedBadges
+            }));
+        } catch (error) {
+            console.error('Failed to save local badge progress:', error);
+        }
+    }
+    
+    loadLocalProgress() {
+        try {
+            const saved = localStorage.getItem('ss_badge_progress');
+            if (saved) {
+                const data = JSON.parse(saved);
+                this.userProgress = data.progress || {};
+                this.earnedBadges = data.earned || [];
+            }
+        } catch (error) {
+            console.error('Failed to load local badge progress:', error);
+        }
+    }
+    
+    /**
+     * Event system
+     */
+    bindEvents() {
+        // Listen for activity completion
+        window.addEventListener('activity:completed', (e) => {
+            this.trackActivity(e.detail);
+        });
+        
+        // Listen for session completion
+        window.addEventListener('session:completed', (e) => {
+            // This could trigger session-based badges
+            this.checkSessionBadges(e.detail);
+        });
+    }
+    
+    emit(event, data) {
+        window.dispatchEvent(new CustomEvent(`badges:${event}`, { detail: data }));
+    }
+    
+    /**
+     * Update badge progress display
+     */
+    updateBadgeProgress() {
+        this.emit('progressUpdated', {
+            collection: this.getBadgeCollection(),
+            nextBadges: this.getNextBadgeProgress()
+        });
+    }
+    
+    /**
+     * Check session-based badges
+     */
+    checkSessionBadges(sessionData) {
+        // Check endurance badge
+        if (sessionData.activitiesCompleted >= 20 && !this.hasBadge('endurance')) {
+            const badge = {
+                ...this.specialBadges.endurance,
+                id: 'endurance',
+                earnedDate: new Date().toISOString(),
+                sessionActivities: sessionData.activitiesCompleted
+            };
+            
+            this.earnedBadges.push(badge);
+            this.emit('badgesEarned', [badge]);
+        }
+    }
+}
+
+// Export for use in other modules
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = BadgeSystem;
+}
