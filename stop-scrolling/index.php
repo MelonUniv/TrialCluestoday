@@ -8,6 +8,14 @@ session_start();
 
 // Load configuration
 require_once __DIR__ . '/config/app.php';
+$analyticsConfig = require __DIR__ . '/config/analytics.php';
+$analyticsEnabled = !empty($analyticsConfig['enabled'])
+    && !empty($analyticsConfig['firebase']['appId'])
+    && !empty($analyticsConfig['firebase']['measurementId']);
+
+if (!$analyticsEnabled) {
+    $analyticsConfig['enabled'] = false;
+}
 
 // Check if it's an API request
 if (strpos($_SERVER['REQUEST_URI'], '/api/') !== false) {
@@ -49,10 +57,17 @@ if (strpos($_SERVER['REQUEST_URI'], '/api/') !== false) {
     <!-- Preconnect to CDNs -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <script>
+        window.__APP_ANALYTICS__ = <?php echo json_encode($analyticsConfig, JSON_UNESCAPED_SLASHES); ?>;
+    </script>
+<?php if ($analyticsEnabled): ?>
+    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-analytics-compat.js" defer></script>
+<?php endif; ?>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900">
     <!-- App Root -->
-    <div id="app" class="min-h-screen">
+    <div id="app" class="min-h-screen" role="main" aria-live="polite">
         <!-- Landing Page -->
         <div class="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900">
             <div class="mx-auto px-4 py-8 max-w-md">
@@ -190,6 +205,9 @@ if (strpos($_SERVER['REQUEST_URI'], '/api/') !== false) {
             }, 1000);
         });
     </script>
+    <script src="/stop-scrolling/assets/js/theme.js?v=1.0"></script>
+    <script src="/stop-scrolling/assets/js/hooks/themeHooks.js?v=1.0"></script>
+    <script src="/stop-scrolling/assets/js/analytics.js?v=1.0"></script>
     <script src="/stop-scrolling/assets/js/games/MemoryGame.js?v=1.0"></script>
     <script src="/stop-scrolling/assets/js/games/PuzzleGame.js?v=1.0"></script>
     <script src="/stop-scrolling/assets/js/games/QuizGame.js?v=1.0"></script>
