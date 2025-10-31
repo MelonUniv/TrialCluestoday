@@ -3,6 +3,7 @@
     var queue = [];
     var analyticsInstance = null;
     var initializing = false;
+    var nativeBridge = null;
 
     function ensureFirebaseInstance() {
         if (!config.enabled || config.provider !== 'firebase') {
@@ -42,7 +43,81 @@
         return analyticsInstance;
     }
 
+    function resolveNativeBridge() {
+        if (nativeBridge) {
+            return nativeBridge;
+        }
+
+        if (config && typeof config.nativeBridge === 'string' && global[config.nativeBridge]) {
+            nativeBridge = global[config.nativeBridge];
+            return nativeBridge;
+        }
+
+        if (global.__STOP_SCROLLING_NATIVE_BRIDGE__) {
+            nativeBridge = global.__STOP_SCROLLING_NATIVE_BRIDGE__;
+            return nativeBridge;
+        }
+
+        if (global.ReactNativeWebView) {
+            nativeBridge = global.ReactNativeWebView;
+            return nativeBridge;
+        }
+
+        return null;
+    }
+
+    function dispatchToNative(event) {
+        var bridge = resolveNativeBridge();
+        if (!bridge) {
+            return false;
+        }
+
+        var payload = {
+            scope: 'stop-scrolling.analytics',
+            event: event
+        };
+
+        try {
+            if (typeof bridge.postMessage === 'function') {
+                bridge.postMessage(JSON.stringify(payload));
+                return true;
+            }
+
+            if (typeof bridge.send === 'function') {
+                bridge.send(payload);
+                return true;
+            }
+
+            if (typeof bridge.emit === 'function') {
+                bridge.emit('analytics', payload);
+                return true;
+            }
+        } catch (error) {
+            if (typeof console !== 'undefined' && console.warn) {
+                console.warn('Native analytics bridge failed', error);
+            }
+        }
+
+        return false;
+    }
+
     function flushQueue() {
+        if (config.provider === 'react-native') {
+            if (!resolveNativeBridge()) {
+                return;
+            }
+
+            while (queue.length) {
+                var event = queue[0];
+                if (dispatchToNative(event)) {
+                    queue.shift();
+                } else {
+                    break;
+                }
+            }
+            return;
+        }
+
         var instance = ensureFirebaseInstance();
         if (!instance || !instance.logEvent) {
             return;
@@ -93,6 +168,11 @@
         trackError: function (message, params) {
             enqueue({ type: 'event', name: 'app_error', params: Object.assign({ message: message }, params) });
         },
+        setNativeBridge: function (bridge) {
+            nativeBridge = bridge || null;
+            flushQueue();
+        },
+        __resolveNativeBridge: resolveNativeBridge,
         __getQueue: function () {
             return queue.slice();
         },
@@ -100,6 +180,7 @@
             queue.length = 0;
             analyticsInstance = null;
             initializing = false;
+            nativeBridge = null;
         }
     };
 

@@ -33,3 +33,55 @@ test('analytics ignores events when disabled', () => {
   analytics.trackScreen('home', {});
   assert.equal(analytics.__getQueue().length, 0);
 });
+
+test('analytics waits for native bridge before flushing in react-native mode', () => {
+  const analytics = loadAnalytics({ enabled: true, provider: 'react-native' });
+  analytics.__resetQueue();
+
+  analytics.trackEvent('native_event', { value: 1 });
+  assert.equal(analytics.__getQueue().length, 1);
+
+  const messages = [];
+  const bridge = {
+    postMessage(payload) {
+      messages.push(JSON.parse(payload));
+    }
+  };
+
+  analytics.setNativeBridge(bridge);
+  assert.equal(analytics.__getQueue().length, 0);
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].event.name, 'native_event');
+  assert.equal(messages[0].event.params.value, 1);
+  analytics.__resetQueue();
+});
+
+test('analytics resolves bridge automatically from global hints', () => {
+  global.__STOP_SCROLLING_NATIVE_BRIDGE__ = {
+    emit(eventName, payload) {
+      this.lastPayload = { eventName, payload };
+    }
+  };
+
+  const analytics = loadAnalytics({ enabled: true, provider: 'react-native' });
+  analytics.__resetQueue();
+
+  analytics.trackScreen('native-home');
+  flushNativeQueue(analytics);
+
+  assert(global.__STOP_SCROLLING_NATIVE_BRIDGE__.lastPayload);
+  assert.equal(global.__STOP_SCROLLING_NATIVE_BRIDGE__.lastPayload.eventName, 'analytics');
+  assert.equal(global.__STOP_SCROLLING_NATIVE_BRIDGE__.lastPayload.payload.event.name, 'native-home');
+
+  delete global.__STOP_SCROLLING_NATIVE_BRIDGE__;
+  analytics.__resetQueue();
+});
+
+function flushNativeQueue(analytics) {
+  // Force queue processing by toggling the bridge reference. This mirrors
+  // what would happen when the React Native layer becomes available.
+  const bridge = analytics.__resolveNativeBridge();
+  if (bridge && analytics.setNativeBridge) {
+    analytics.setNativeBridge(bridge);
+  }
+}
