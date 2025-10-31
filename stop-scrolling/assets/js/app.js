@@ -45,6 +45,18 @@ const AppState = {
     }
 };
 
+const ThemeManager = (typeof ThemeHooks !== 'undefined' && typeof StopScrollingTheme !== 'undefined')
+    ? ThemeHooks.createThemeManager(StopScrollingTheme)
+    : null;
+
+if (ThemeManager) {
+    ThemeManager.subscribe(function(mode) {
+        if (typeof document !== 'undefined') {
+            document.documentElement.setAttribute('data-theme', mode);
+        }
+    });
+}
+
 // Initialize App
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Stop Scrolling App Initializing...');
@@ -57,10 +69,17 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize engagement systems
     initializeEngagementSystems();
-    
+
     // Initialize router
     initRouter();
-    
+
+    if (typeof Analytics !== 'undefined' && Analytics.trackEvent) {
+        Analytics.trackEvent('app_initialized', {
+            theme: AppState.theme,
+            authenticated: AppState.isAuthenticated
+        });
+    }
+
     // Hide initial loader
     setTimeout(() => {
         const loader = document.getElementById('initial-loader');
@@ -83,48 +102,65 @@ function initializeEngagementSystems() {
         // Only initialize if user is authenticated and systems aren't already initialized
         if (AppState.isAuthenticated && !AppState.engagement.initialized) {
             console.log('Initializing engagement systems...');
-            
+            const initializedSystems = [];
+
             // Initialize StreakManager
             if (typeof StreakManager !== 'undefined') {
                 AppState.engagement.streakManager = new StreakManager();
                 console.log('StreakManager initialized');
+                initializedSystems.push('streak');
             }
-            
+
             // Initialize ComboSystem
             if (typeof ComboSystem !== 'undefined') {
                 AppState.engagement.comboSystem = new ComboSystem();
                 console.log('ComboSystem initialized');
+                initializedSystems.push('combo');
             }
-            
+
             // Initialize BadgeSystem
             if (typeof BadgeSystem !== 'undefined') {
                 AppState.engagement.badgeSystem = new BadgeSystem();
                 console.log('BadgeSystem initialized');
+                initializedSystems.push('badge');
             }
-            
+
             // Initialize AchievementSystem
             if (typeof AchievementSystem !== 'undefined') {
                 AppState.engagement.achievementSystem = new AchievementSystem();
                 console.log('AchievementSystem initialized');
+                initializedSystems.push('achievement');
             }
-            
+
             // Initialize MotivationalMessaging
             if (typeof MotivationalMessaging !== 'undefined') {
                 AppState.engagement.motivationalMessaging = new MotivationalMessaging();
                 console.log('MotivationalMessaging initialized');
+                initializedSystems.push('motivation');
             }
-            
+
             // Initialize DailyRecapSystem
             if (typeof DailyRecapSystem !== 'undefined') {
                 AppState.engagement.dailyRecapSystem = new DailyRecapSystem();
                 console.log('DailyRecapSystem initialized');
+                initializedSystems.push('daily-recap');
             }
-            
+
             AppState.engagement.initialized = true;
             console.log('All engagement systems initialized successfully');
+
+            if (initializedSystems.length && typeof Analytics !== 'undefined' && Analytics.trackEvent) {
+                Analytics.trackEvent('engagement_systems_initialized', {
+                    systems: initializedSystems.join(','),
+                    total: initializedSystems.length
+                });
+            }
         }
     } catch (error) {
         console.error('Error initializing engagement systems:', error);
+        if (typeof Analytics !== 'undefined' && Analytics.trackError) {
+            Analytics.trackError('engagement_initialization_failed', { message: error.message });
+        }
     }
 }
 
@@ -213,6 +249,12 @@ function initRouter() {
     // Handle browser back/forward
     window.addEventListener('popstate', function(event) {
         if (event.state && event.state.page) {
+            if (typeof Analytics !== 'undefined' && Analytics.trackEvent) {
+                Analytics.trackEvent('navigation', {
+                    destination: event.state.page,
+                    source: 'history'
+                });
+            }
             renderPage(event.state.page);
         }
     });
@@ -220,6 +262,12 @@ function initRouter() {
 
 function navigateTo(page) {
     history.pushState({ page: page }, '', `#${page}`);
+    if (typeof Analytics !== 'undefined' && Analytics.trackEvent) {
+        Analytics.trackEvent('navigation', {
+            destination: page,
+            source: 'link'
+        });
+    }
     renderPage(page);
 }
 
@@ -227,7 +275,14 @@ function navigateTo(page) {
 function renderPage(page) {
     const app = document.getElementById('app');
     AppState.currentPage = page;
-    
+
+    if (typeof Analytics !== 'undefined' && Analytics.trackScreen) {
+        Analytics.trackScreen(page, {
+            theme: AppState.theme,
+            isAuthenticated: AppState.isAuthenticated
+        });
+    }
+
     // Clear current content
     app.innerHTML = '';
     
@@ -273,57 +328,57 @@ function renderLandingPage() {
         <div class="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900">
             <!-- Hero Section -->
             <div class="relative overflow-hidden">
-                <div class="mx-auto px-4 py-8 max-w-md">
+                <div class="mx-auto px-6 md:px-10 py-12 max-w-4xl">
                     <div class="text-center">
-                        <h1 class="text-3xl font-bold text-white mb-6 leading-tight">
-                            Stop Scrolling,<br>Start Living
+                        <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-6 leading-tight">
+                            Stop Scrolling,<br><span class="text-indigo-100">Start Living</span>
                         </h1>
-                        <p class="text-lg text-gray-200 mb-8">
+                        <p class="text-lg md:text-xl text-gray-200 mb-8 max-w-3xl mx-auto">
                             Break free from social media addiction with engaging cognitive exercises, games, and mindfulness activities designed to rewire your brain for better focus and productivity.
                         </p>
-                        
+
                         <!-- CTA Buttons -->
-                        <div class="flex flex-col gap-4 mb-12">
-                            <button onclick="navigateTo('register')" class="bg-white text-indigo-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
+                        <div class="flex flex-col sm:flex-row gap-4 justify-center mb-12">
+                            <button onclick="navigateTo('register')" aria-label="Create a new Stop Scrolling account" class="bg-white text-indigo-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors shadow-lg focus:ring-2 focus:ring-offset-2 focus:ring-indigo-200">
                                 Get Started Free
                             </button>
-                            <button onclick="navigateTo('login')" class="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-indigo-600 transition-colors">
+                            <button onclick="navigateTo('login')" aria-label="Sign in to your Stop Scrolling account" class="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-indigo-600 transition-colors focus:ring-2 focus:ring-offset-2 focus:ring-white">
                                 Sign In
                             </button>
                         </div>
-                        
+
                         <!-- Features Preview -->
-                        <div class="space-y-6 mt-12">
-                            <div class="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-6">
-                                <div class="text-4xl mb-4">🧠</div>
+                        <div class="grid gap-6 mt-12 md:grid-cols-3" role="list">
+                            <div class="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-6" role="listitem">
+                                <div class="text-4xl mb-4" aria-hidden="true">🧠</div>
                                 <h3 class="text-xl font-semibold text-white mb-2">Memory Games</h3>
                                 <p class="text-gray-200">Challenge your mind with card matching, sequences, and pattern recognition games.</p>
                             </div>
-                            <div class="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-6">
-                                <div class="text-4xl mb-4">🧩</div>
+                            <div class="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-6" role="listitem">
+                                <div class="text-4xl mb-4" aria-hidden="true">🧩</div>
                                 <h3 class="text-xl font-semibold text-white mb-2">Puzzle Challenges</h3>
                                 <p class="text-gray-200">Solve sliding puzzles, word searches, and logic problems to sharpen your focus.</p>
                             </div>
-                            <div class="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-6">
-                                <div class="text-4xl mb-4">🧘</div>
+                            <div class="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-6" role="listitem">
+                                <div class="text-4xl mb-4" aria-hidden="true">🧘</div>
                                 <h3 class="text-xl font-semibold text-white mb-2">Mindfulness</h3>
                                 <p class="text-gray-200">Practice breathing exercises and meditation to reduce anxiety and improve well-being.</p>
                             </div>
                         </div>
-                        
+
                         <!-- Stats -->
-                        <div class="grid grid-cols-3 gap-4 mt-12">
-                            <div class="text-center">
-                                <div class="text-3xl font-bold text-white">48</div>
-                                <div class="text-gray-200">Active Users</div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-12" role="group" aria-label="Community highlights">
+                            <div class="text-center bg-white bg-opacity-10 rounded-lg py-4">
+                                <div class="text-3xl font-bold text-white" aria-label="Forty eight active users">48</div>
+                                <div class="text-gray-200 text-sm">Active Users</div>
                             </div>
-                            <div class="text-center">
-                                <div class="text-3xl font-bold text-white">59</div>
-                                <div class="text-gray-200">Activities</div>
+                            <div class="text-center bg-white bg-opacity-10 rounded-lg py-4">
+                                <div class="text-3xl font-bold text-white" aria-label="Fifty nine activities available">59</div>
+                                <div class="text-gray-200 text-sm">Activities</div>
                             </div>
-                            <div class="text-center">
-                                <div class="text-3xl font-bold text-white">100%</div>
-                                <div class="text-gray-200">Free</div>
+                            <div class="text-center bg-white bg-opacity-10 rounded-lg py-4">
+                                <div class="text-3xl font-bold text-white" aria-label="Always free">100%</div>
+                                <div class="text-gray-200 text-sm">Free</div>
                             </div>
                         </div>
                     </div>
@@ -339,23 +394,23 @@ function renderHomePage() {
     
     app.innerHTML = `
         <!-- Main Navigation -->
-        <nav class="bg-white dark:bg-gray-800 shadow-lg relative">
+        <nav class="bg-white dark:bg-gray-800 shadow-lg relative" aria-label="Primary">
             <div class="mx-auto px-4 max-w-md">
                 <div class="flex justify-between h-16">
                     <!-- Mobile App Navigation -->
                     <div class="text-center mb-4">
-                        <h1 class="text-xl font-bold text-indigo-600">Stop Scrolling</h1>
+                        <h1 class="text-xl font-bold text-indigo-600" aria-label="Stop Scrolling home">Stop Scrolling</h1>
                     </div>
-                        
+
                     <!-- Navigation Links -->
-                    <div class="flex flex-col space-y-3">
-                            <a href="#" onclick="navigateTo('home')" class="text-gray-900 dark:text-white inline-flex items-center px-1 pt-1 border-b-2 border-indigo-500 text-sm font-medium">
+                    <div class="flex flex-col space-y-3" role="menubar">
+                            <a href="#" onclick="navigateTo('home')" role="menuitem" aria-current="${AppState.currentPage === 'home' ? 'page' : 'false'}" class="text-gray-900 dark:text-white inline-flex items-center px-1 pt-1 border-b-2 border-indigo-500 text-sm font-medium">
                                 Dashboard
                             </a>
-                            <a href="#" onclick="navigateTo('activities')" class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 inline-flex items-center px-1 pt-1 border-b-2 border-transparent hover:border-gray-300 text-sm font-medium">
+                            <a href="#" onclick="navigateTo('activities')" role="menuitem" aria-current="${AppState.currentPage === 'activities' ? 'page' : 'false'}" class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 inline-flex items-center px-1 pt-1 border-b-2 border-transparent hover:border-gray-300 text-sm font-medium">
                                 Activities
                             </a>
-                            <a href="#" onclick="navigateTo('progress')" class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 inline-flex items-center px-1 pt-1 border-b-2 border-transparent hover:border-gray-300 text-sm font-medium">
+                            <a href="#" onclick="navigateTo('progress')" role="menuitem" aria-current="${AppState.currentPage === 'progress' ? 'page' : 'false'}" class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 inline-flex items-center px-1 pt-1 border-b-2 border-transparent hover:border-gray-300 text-sm font-medium">
                                 Progress
                             </a>
                         </div>
@@ -364,7 +419,7 @@ function renderHomePage() {
                     <!-- Right side - User menu, notifications, theme -->
                     <div class="flex items-center space-x-4">
                         <!-- Notifications -->
-                        <button class="p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 relative">
+                        <button class="p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 relative" aria-label="View notifications" title="Notifications">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5h5m-5-5v-5a6 6 0 10-12 0v5"></path>
                             </svg>
@@ -372,7 +427,7 @@ function renderHomePage() {
                         </button>
 
                         <!-- Theme Toggle -->
-                        <button onclick="toggleTheme()" class="p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+                        <button onclick="toggleTheme()" class="p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" aria-label="Toggle theme" title="Toggle theme">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
                             </svg>
@@ -753,7 +808,7 @@ function renderDashboard() {
                 <div class="flow-hero">
                     <h1>Ready for Your Brain Training Journey?</h1>
                     <p>Engage your mind with personalized cognitive exercises that adapt to your performance</p>
-                    <button onclick="showSessionSelector()" class="start-journey-btn">
+                    <button onclick="showSessionSelector()" class="start-journey-btn" aria-label="Open session selector">
                         🚀 Start Journey
                     </button>
                 </div>
@@ -761,15 +816,15 @@ function renderDashboard() {
                 <!-- Quick Stats -->
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6" id="engagement-stats">
                     <div class="bg-white rounded-lg shadow p-6">
-                        <div class="text-3xl font-bold text-indigo-600" id="sessions-today">0</div>
+                        <div class="text-3xl font-bold text-indigo-600" id="sessions-today" aria-live="polite" role="text">0</div>
                         <div class="text-gray-600">Sessions Today</div>
                     </div>
                     <div class="bg-white rounded-lg shadow p-6">
-                        <div class="text-3xl font-bold text-green-600" id="current-streak">0</div>
+                        <div class="text-3xl font-bold text-green-600" id="current-streak" aria-live="polite" role="text">0</div>
                         <div class="text-gray-600">Current Streak</div>
                     </div>
                     <div class="bg-white rounded-lg shadow p-6">
-                        <div class="text-3xl font-bold text-purple-600" id="total-xp">0</div>
+                        <div class="text-3xl font-bold text-purple-600" id="total-xp" aria-live="polite" role="text">0</div>
                         <div class="text-gray-600">Total XP</div>
                     </div>
                     <div class="bg-white rounded-lg shadow p-6">
@@ -1835,14 +1890,32 @@ function setupSearchHandlers() {
 
 // Theme Functions
 function applyTheme(theme) {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('ss_theme', theme);
-    AppState.theme = theme;
+    const nextTheme = ThemeManager ? ThemeManager.setMode(theme) : theme;
+
+    if (!ThemeManager && typeof StopScrollingTheme !== 'undefined' && StopScrollingTheme.applyCssVariables) {
+        StopScrollingTheme.applyCssVariables(nextTheme);
+    }
+
+    if (typeof document !== 'undefined' && document.documentElement) {
+        document.documentElement.setAttribute('data-theme', nextTheme);
+    }
+
+    localStorage.setItem('ss_theme', nextTheme);
+    AppState.theme = nextTheme;
+
+    if (typeof Analytics !== 'undefined' && Analytics.trackEvent) {
+        Analytics.trackEvent('theme_applied', { mode: nextTheme });
+    }
+
+    return nextTheme;
 }
 
 function toggleTheme() {
     const newTheme = AppState.theme === 'light' ? 'dark' : 'light';
-    applyTheme(newTheme);
+    const appliedTheme = applyTheme(newTheme);
+    if (typeof Analytics !== 'undefined' && Analytics.trackEvent) {
+        Analytics.trackEvent('theme_toggle', { mode: appliedTheme });
+    }
 }
 
 // Navigation Functions

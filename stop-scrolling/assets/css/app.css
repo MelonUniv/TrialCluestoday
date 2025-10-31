@@ -4,26 +4,43 @@
 
 /* CSS Variables for Theming */
 :root {
-    --primary-color: #667eea;
-    --primary-dark: #5a67d8;
-    --secondary-color: #48bb78;
-    --danger-color: #f56565;
-    --warning-color: #ed8936;
-    --info-color: #4299e1;
-    --light-bg: #f7fafc;
-    --dark-bg: #1a202c;
-    --text-primary: #2d3748;
-    --text-secondary: #718096;
-    --border-color: #e2e8f0;
+    --color-primary: #6366F1;
+    --color-primary-muted: #818CF8;
+    --color-primary-strong: #4C51BF;
+    --color-secondary: #EC4899;
+    --color-success: #22C55E;
+    --color-warning: #F59E0B;
+    --color-danger: #EF4444;
+    --color-surface: #FFFFFF;
+    --color-surface-alt: #F8FAFC;
+    --color-outline: #E2E8F0;
+    --color-text-primary: #1E293B;
+    --color-text-secondary: #475569;
+    --color-text-on-primary: #FFFFFF;
+    --font-family-base: 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    --font-heading-h1: 700 2.75rem/1.2 var(--font-family-base);
+    --font-heading-h2: 700 2.25rem/1.3 var(--font-family-base);
+    --font-heading-h3: 600 1.75rem/1.35 var(--font-family-base);
+    --font-heading-h4: 600 1.35rem/1.4 var(--font-family-base);
+    --font-body: 400 1rem/1.6 var(--font-family-base);
+    --font-label: 500 0.875rem/1.6 var(--font-family-base);
 }
 
 /* Dark Mode Variables */
 [data-theme="dark"] {
-    --light-bg: #1a202c;
-    --dark-bg: #0f1419;
-    --text-primary: #f7fafc;
-    --text-secondary: #a0aec0;
-    --border-color: #2d3748;
+    --color-primary: #818CF8;
+    --color-primary-muted: #A5B4FC;
+    --color-primary-strong: #4C51BF;
+    --color-secondary: #F472B6;
+    --color-success: #4ADE80;
+    --color-warning: #FBBF24;
+    --color-danger: #F87171;
+    --color-surface: #0F172A;
+    --color-surface-alt: #1E293B;
+    --color-outline: #334155;
+    --color-text-primary: #E2E8F0;
+    --color-text-secondary: #CBD5F5;
+    --color-text-on-primary: #1E1B4B;
 }
 
 /* Base Styles */
@@ -32,11 +49,11 @@
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-family: var(--font-family-base);
     margin: 0;
     padding: 0;
-    background-color: var(--light-bg);
-    color: var(--text-primary);
+    background-color: var(--color-surface-alt);
+    color: var(--color-text-primary);
     transition: background-color 0.3s ease, color 0.3s ease;
 }
 
@@ -139,13 +156,34 @@ html {
     scroll-behavior: smooth;
 }
 
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
 /* Focus styles for accessibility */
 a:focus,
 button:focus,
 input:focus,
 select:focus,
 textarea:focus {
-    outline: 2px solid var(--primary-color);
+    outline: 2px solid var(--color-primary);
     outline-offset: 2px;
 }
 
